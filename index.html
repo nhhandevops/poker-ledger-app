@@ -1,0 +1,2586 @@
+<!doctype html>
+<html lang="vi" data-theme="felt">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>Poker Ledger</title>
+  <style>
+  /* Nghĩa màu tiền CỐ ĐỊNH mọi theme: xanh=thắng, đỏ=thua */
+  :root { --win:#3DDC84; --loss:#FF5D5D; --chip:#4CC2FF; }
+
+  /* Theme A · Casino Felt (mặc định) */
+  :root[data-theme="felt"] {
+    --bg:#0B0E0C; --surface:#13221A; --raised:#1B3327; --hairline:#2A4436;
+    --accent:#D4AF37; --accent-bright:#F5D272; --text:#F5F3EC; --muted:#9CAE9F;
+    --felt-glow: radial-gradient(120% 80% at 50% -10%, #1c3b2a 0%, #0B0E0C 60%);
+  }
+  /* Theme B · Luxe Vault (đen ấm + gold) */
+  :root[data-theme="vault"] {
+    --bg:#0A0906; --surface:#151210; --raised:#211B14; --hairline:#382C1C;
+    --accent:#E7BE4C; --accent-bright:#FADE8B; --text:#F5F0E4; --muted:#AC9F86;
+    --felt-glow: radial-gradient(120% 80% at 50% -10%, #2a2110 0%, #0A0906 62%);
+  }
+  /* Theme C · Dark Neon (cyan + magenta) */
+  :root[data-theme="neon"] {
+    --bg:#08080F; --surface:#111122; --raised:#191934; --hairline:#2C2C5A;
+    --accent:#2DD4EE; --accent-bright:#EC7BF5; --text:#EBEBFF; --muted:#8686C4;
+    --felt-glow: radial-gradient(120% 80% at 50% -10%, #1e1e46 0%, #08080F 62%);
+  }
+
+  * { box-sizing:border-box; }
+  /* Thuộc tính hidden phải luôn thắng class có display: (nếu không, .loading/.add-form ẩn không được) */
+  [hidden] { display:none !important; }
+  html, body { margin:0; }
+  body {
+    background:var(--bg); background-image:var(--felt-glow); background-attachment:fixed;
+    color:var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing:antialiased; padding-bottom:48px; min-height:100vh;
+  }
+  h1,h2 { margin:0; font-weight:700; }
+  /* Chuyển cảnh mượt khi đổi theme (các phần tử không có transition transform riêng) */
+  body, .topbar, .card, .panel, .cfg-pill, .chip-input, .avatar, .lb-bar, .inp {
+    transition: background-color .35s ease, border-color .35s ease, color .35s ease;
+  }
+
+  /* ── Top bar ─────────────────────────────────────────────── */
+  .topbar {
+    position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between;
+    gap:12px; padding:12px 16px; background:rgba(11,14,12,.72); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--hairline);
+  }
+  .brand { font-size:17px; font-weight:800; letter-spacing:.5px; display:flex; align-items:center; gap:8px; }
+  .brand .suit { font-size:19px; color:var(--accent); }
+  .brand .suit .red { color:var(--loss); }
+  .brand .sub { font-size:11px; font-weight:600; color:var(--muted); letter-spacing:.6px; text-transform:uppercase; }
+  .topbar-right { display:flex; align-items:center; gap:10px; }
+  .live { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--muted); }
+  .live .dot { width:8px; height:8px; border-radius:50%; background:var(--win); box-shadow:0 0 8px var(--win); animation:pulse 2s infinite; }
+  .live .synced { color:var(--muted); font-weight:600; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .icon-btn {
+    border:1px solid var(--hairline); background:var(--raised); color:var(--text); border-radius:10px;
+    width:38px; height:38px; font-size:17px; cursor:pointer; transition:transform .12s, border-color .12s;
+  }
+  .icon-btn:hover { border-color:var(--accent); transform:translateY(-1px); }
+  .icon-btn:active { transform:scale(.94); }
+
+  /* ── Layout ──────────────────────────────────────────────── */
+  #app { max-width:820px; margin:0 auto; padding:16px; display:flex; flex-direction:column; gap:16px; }
+  .card, .panel {
+    background:var(--surface); border:1px solid var(--hairline); border-radius:16px;
+    box-shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+
+  /* ── Config bar ──────────────────────────────────────────── */
+  .config-bar { padding:14px 16px; }
+  .config-top { display:flex; align-items:flex-start; gap:10px; }
+  .cfg-edit-btn {
+    flex:0 0 auto; border:1px solid var(--hairline); background:var(--raised); color:var(--text);
+    border-radius:9px; width:34px; height:34px; font-size:15px; cursor:pointer; transition:border-color .12s, transform .1s;
+  }
+  .cfg-edit-btn:hover { border-color:var(--accent); } .cfg-edit-btn:active { transform:scale(.94); }
+  .cfg-form { display:grid; grid-template-columns:1fr 1fr; gap:10px 12px; margin-top:14px; padding-top:14px; border-top:1px solid var(--hairline); }
+  .cfg-form label { display:flex; flex-direction:column; gap:5px; font-size:11px; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); font-weight:600; }
+  .cfg-form .inp { text-transform:none; letter-spacing:0; }
+  .cfg-note { text-transform:none; letter-spacing:0; color:var(--muted); font-weight:500; font-size:10px; }
+  .cfg-form-actions { grid-column:1 / -1; display:flex; gap:8px; justify-content:flex-end; }
+  .cfg-form input:disabled { opacity:.5; cursor:not-allowed; }
+  .cfg-form label.cfg-check { flex-direction:row; align-items:center; gap:7px; grid-column:1 / -1; text-transform:none; letter-spacing:0; color:var(--text); font-weight:500; font-size:13px; }
+  .cfg-form label.cfg-check input { width:auto; }
+  /* Mục Chip + editor stack khởi điểm (Phase 12) */
+  .cfg-sec { grid-column:1 / -1; margin-top:4px; font-size:11px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--accent); border-bottom:1px solid var(--hairline); padding-bottom:5px; }
+  .config-line { display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; }
+  .cfg-pill {
+    display:inline-flex; align-items:baseline; gap:6px; padding:6px 11px; border-radius:999px;
+    background:var(--raised); border:1px solid var(--hairline); font-size:13px; white-space:nowrap;
+  }
+  .cfg-pill b { color:var(--accent-bright); font-variant-numeric:tabular-nums; }
+  .cfg-pill .lbl { font-size:10px; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); }
+  .config-sep { height:1px; background:var(--hairline); margin:12px 0; opacity:.6; }
+  .stat-row { display:flex; flex-wrap:wrap; gap:18px; }
+  .stat { display:flex; flex-direction:column; gap:2px; }
+  .stat .k { font-size:10px; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); }
+  .stat .v { font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .balance-ok { color:var(--win); } .balance-bad { color:var(--loss); }
+
+  /* ── Panel head ──────────────────────────────────────────── */
+  .panel-head { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--hairline); }
+  .panel-head h2 { font-size:13px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+  .panel-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+
+  .btn {
+    border:1px solid var(--hairline); background:var(--raised); color:var(--text); font-weight:700;
+    padding:9px 14px; border-radius:11px; cursor:pointer; font-size:14px; transition:transform .1s, border-color .12s, background .12s;
+  }
+  .btn:hover { transform:translateY(-1px); } .btn:active { transform:scale(.96); }
+  .btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+  .btn-accent { background:linear-gradient(180deg, var(--accent-bright), var(--accent)); color:#1a1300; border-color:transparent; }
+  .btn-ghost { background:transparent; }
+
+  /* ── Add form ────────────────────────────────────────────── */
+  .add-form { display:flex; flex-wrap:wrap; gap:8px; padding:14px 16px; border-bottom:1px solid var(--hairline); background:rgba(0,0,0,.15); }
+  .add-hint { flex:1 1 100%; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; min-height:1em; }
+  .add-row { flex:1 1 100%; display:flex; flex-wrap:wrap; gap:8px; }
+  /* ── Thêm hàng loạt (Phase 15) ───────────────────────────── */
+  .add-bulk { flex:1 1 100%; display:flex; flex-direction:column; gap:8px; }
+  .inp-bulk { flex:1 1 100%; width:100%; resize:vertical; min-height:76px; line-height:1.5; font-family:inherit; }
+  .add-bulk-foot { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .add-bulk-count { font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .add-link { flex:1 1 100%; text-align:left; background:none; border:none; padding:2px 0; margin:0;
+    color:var(--accent); font-size:13px; cursor:pointer; }
+  .add-link:hover { text-decoration:underline; }
+  .inp {
+    flex:1 1 160px; min-width:0; padding:10px 12px; border-radius:10px; border:1px solid var(--hairline);
+    background:var(--bg); color:var(--text); font-size:15px; outline:none;
+  }
+  .inp:focus { border-color:var(--accent); }
+  .inp-money { flex:0 1 130px; font-variant-numeric:tabular-nums; }
+
+  /* ── Player list ─────────────────────────────────────────── */
+  .player-list { display:flex; flex-direction:column; }
+  .player {
+    display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--hairline);
+    transition:background .12s;
+  }
+  .player:last-child { border-bottom:0; }
+  .player:hover { background:rgba(255,255,255,.02); }
+  .player.saving { opacity:.6; }
+  .avatar {
+    width:38px; height:38px; flex:0 0 38px; border-radius:11px; display:grid; place-items:center;
+    font-weight:800; font-size:16px; color:#0b0b0b; background:var(--c,#888);
+    box-shadow:0 2px 8px rgba(0,0,0,.4);
+  }
+  .crown { position:absolute; margin-top:-30px; margin-left:22px; font-size:15px; }
+  .p-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:6px; }
+  .p-name { font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px; }
+  .p-buyins { font-size:11px; font-weight:600; color:var(--muted); }
+  .chip-stepper { display:flex; align-items:center; gap:6px; }
+  .step {
+    width:30px; height:30px; border-radius:8px; border:1px solid var(--hairline); background:var(--raised);
+    color:var(--text); font-size:18px; line-height:1; cursor:pointer; display:grid; place-items:center; user-select:none;
+  }
+  .step:hover { border-color:var(--chip); } .step:active { transform:scale(.9); }
+  .chip-input {
+    width:64px; padding:6px 8px; text-align:center; border-radius:8px; border:1px solid var(--hairline);
+    background:var(--bg); color:var(--chip); font-weight:800; font-size:15px; font-variant-numeric:tabular-nums; outline:none;
+  }
+  .chip-input:focus { border-color:var(--chip); }
+  .chip-unit { font-size:11px; color:var(--muted); }
+  /* Chip theo điểm + editor mệnh giá (Phase 12) */
+  .player.open { align-items:flex-start; }
+  .chip-line { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--muted); }
+  .chip-line .chip-pts { color:var(--chip); font-weight:800; font-size:16px; font-variant-numeric:tabular-nums; }
+  .chip-line .chip-vnd { font-variant-numeric:tabular-nums; }
+  .chip-toggle { margin-left:2px; border:1px solid var(--hairline); background:var(--raised); color:var(--muted); border-radius:7px; padding:2px 7px; font-size:11px; font-weight:700; cursor:pointer; }
+  .chip-toggle:hover { border-color:var(--chip); color:var(--chip); }
+  .denom-editor { margin-top:8px; display:flex; flex-direction:column; gap:8px; padding:10px; background:var(--bg); border:1px solid var(--hairline); border-radius:10px; }
+  .denom-cells { display:flex; flex-wrap:wrap; gap:6px; }
+  .denom-cell { display:flex; align-items:center; gap:3px; background:var(--surface); border:1px solid var(--hairline); border-radius:8px; padding:3px 5px; }
+  .denom-face { min-width:24px; text-align:center; font-weight:800; color:var(--accent-bright); font-variant-numeric:tabular-nums; }
+  .denom-btn { width:22px; height:22px; border-radius:5px; border:1px solid var(--hairline); background:var(--raised); color:var(--text); font-size:14px; line-height:1; cursor:pointer; }
+  .denom-count { width:34px; padding:2px; text-align:center; border-radius:5px; border:1px solid var(--hairline); background:var(--bg); color:var(--chip); font-weight:800; font-variant-numeric:tabular-nums; outline:none; }
+  .denom-foot { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .denom-sum { font-size:13px; font-weight:700; color:var(--chip); font-variant-numeric:tabular-nums; }
+  .denom-suggest { border:1px solid var(--hairline); background:var(--raised); color:var(--accent); border-radius:8px; padding:3px 9px; font-size:12px; font-weight:700; cursor:pointer; }
+  .denom-suggest:hover { border-color:var(--accent); }
+  .denom-quick { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); text-transform:none; letter-spacing:0; }
+  .denom-quick .chip-input { width:70px; }
+  .p-net { flex:0 0 auto; font-weight:800; font-size:15px; font-variant-numeric:tabular-nums; text-align:right; min-width:96px; }
+  .p-net.win { color:var(--win); } .p-net.loss { color:var(--loss); } .p-net.zero { color:var(--muted); }
+  .p-cashed { font-size:10px; font-weight:700; color:var(--accent); letter-spacing:.4px; }
+  .p-out { font-size:10px; font-weight:800; color:var(--loss); letter-spacing:.4px; }
+  .p-actions { flex:0 0 auto; display:flex; gap:2px; }
+  .p-actions .act { border:0; background:transparent; color:var(--muted); font-size:15px; cursor:pointer; padding:6px; border-radius:8px; transition:color .12s, background .12s; }
+  .p-actions .act:hover { background:rgba(255,255,255,.06); }
+  .p-actions .rebuy:hover { color:var(--win); }
+  .p-actions .cashout:hover { color:var(--accent-bright); }
+  .p-actions .del:hover { color:var(--loss); background:rgba(255,93,93,.1); }
+  .p-actions .elim:hover { color:var(--loss); }
+  .p-actions .elim.on { color:var(--loss); background:rgba(255,93,93,.16); }
+
+  /* ── Chế độ khóa (không passcode -> chỉ xem) ─────────────── */
+  body.locked #addBtn, body.locked #countBtn, body.locked .step, body.locked .p-actions, body.locked .clock-ctrls,
+  body.locked #cfgEditBtn, body.locked .add-form, body.locked #cfgForm,
+  body.locked .chip-toggle, body.locked .denom-editor { display:none !important; }
+  body.locked .chip-input { pointer-events:none; opacity:.75; border-color:transparent; background:transparent; }
+
+  .empty { padding:34px 20px; text-align:center; color:var(--muted); font-size:15px; line-height:1.6; }
+
+  /* ── Leaderboard (thanh 2 chiều) ─────────────────────────── */
+  .lb-legend { font-size:11px; color:var(--muted); }
+  .lb-legend i { font-style:normal; }
+  .lb-legend .win { color:var(--win); } .lb-legend .loss { color:var(--loss); }
+  .lb-list { display:flex; flex-direction:column; }
+  .lb-row {
+    display:grid; grid-template-columns:34px 1fr auto; grid-template-areas:"rank name net" "bar bar bar";
+    gap:5px 10px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--hairline);
+  }
+  .lb-row:last-child { border-bottom:0; }
+  .lb-rank { grid-area:rank; font-size:15px; font-weight:800; color:var(--muted); text-align:center; }
+  .lb-name { grid-area:name; font-weight:700; font-size:15px; }
+  .lb-name .lb-payout { display:block; font-style:normal; font-weight:700; font-size:11px; color:var(--accent-bright); margin-top:1px; font-variant-numeric:tabular-nums; }
+  select.inp { appearance:none; -webkit-appearance:none; cursor:pointer; }
+  .lb-net { grid-area:net; font-weight:800; font-variant-numeric:tabular-nums; font-size:14px; }
+  .lb-net.win { color:var(--win); } .lb-net.loss { color:var(--loss); } .lb-net.zero { color:var(--muted); }
+  .lb-bar { grid-area:bar; position:relative; height:8px; background:var(--raised); border-radius:4px; overflow:hidden; }
+  .lb-center { position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--muted); opacity:.5; z-index:2; }
+  .lb-fill { position:absolute; top:0; bottom:0; border-radius:4px; transition:width .35s ease; }
+  .lb-fill.win { background:linear-gradient(90deg, rgba(61,220,132,.35), var(--win)); }
+  .lb-fill.loss { background:linear-gradient(270deg, rgba(255,93,93,.35), var(--loss)); }
+
+  /* ── Settlement ──────────────────────────────────────────── */
+  .settle-meta { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .settle-list { display:flex; flex-direction:column; }
+  /* Thứ tự cột: Người trả → Số tiền · Người nhận · [đã trả] (Phase 12) */
+  .settle-row {
+    display:grid; grid-template-columns:1fr 24px auto 1fr auto; grid-template-areas:"from arrow amt to paid";
+    gap:6px 10px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--hairline); font-size:14px;
+  }
+  .settle-row:last-child { border-bottom:0; }
+  .s-from { grid-area:from; } .s-to { grid-area:to; }
+  .s-from, .s-to { display:flex; flex-direction:column; gap:1px; font-weight:700; min-width:0; }
+  .s-from i, .s-to i { font-style:normal; font-size:11px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .s-from i { color:var(--loss); } .s-to i { color:var(--win); }
+  .s-arrow { grid-area:arrow; color:var(--accent); font-weight:800; text-align:center; }
+  .s-amt { grid-area:amt; font-weight:800; font-variant-numeric:tabular-nums; color:var(--accent-bright); text-align:right; white-space:nowrap; }
+  .s-paid {
+    grid-area:paid; justify-self:end;
+    border:1px solid var(--hairline); background:var(--raised); color:var(--muted); border-radius:8px;
+    padding:3px 9px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all .12s;
+  }
+  .s-paid:hover:not(:disabled) { border-color:var(--win); color:var(--win); }
+  .s-paid.done { background:rgba(61,220,132,.15); border-color:var(--win); color:var(--win); }
+  .s-paid:disabled { cursor:default; opacity:.65; }
+  .settle-actions { display:flex; flex-wrap:wrap; gap:8px; padding:14px 16px; border-top:1px solid var(--hairline); }
+  .settle-actions .btn { font-size:13px; padding:8px 12px; }
+  .settle-hint { padding:0 16px 14px; font-size:12px; color:var(--muted); }
+  .settle-hint.warn { color:var(--loss); font-weight:600; }
+  .settle-warn { padding:18px 16px; color:var(--loss); font-weight:700; line-height:1.5; }
+  .settle-warn span { display:block; margin-top:4px; color:var(--muted); font-weight:600; font-size:13px; }
+  .settle-allsquare { padding:22px 16px; text-align:center; color:var(--win); font-weight:700; }
+
+  /* ── Đồng hồ blind (Phase 14) ─────────────────────────────── */
+  .clock-panel { padding:18px 16px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .clock-face { text-align:center; display:flex; flex-direction:column; gap:4px; }
+  .clock-lvl { font-size:12px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); font-weight:700; }
+  .clock-time { font-size:64px; line-height:1; font-weight:800; font-variant-numeric:tabular-nums; color:var(--accent-bright); letter-spacing:1px; }
+  .clock-time.warn { color:var(--loss); animation:pulse 1s infinite; }
+  .clock-blinds { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .clock-blinds .k { color:var(--muted); font-weight:600; font-size:13px; }
+  .clock-blinds.brk { color:var(--accent); letter-spacing:2px; }
+  .clock-next { font-size:12px; color:var(--muted); }
+  .clock-ctrls { display:flex; gap:8px; }
+  .clk-btn { width:44px; height:44px; border-radius:12px; border:1px solid var(--hairline); background:var(--raised); color:var(--text); font-size:18px; cursor:pointer; transition:transform .1s, border-color .12s; }
+  .clk-btn:hover { border-color:var(--accent); } .clk-btn:active { transform:scale(.92); }
+  .clk-play { background:linear-gradient(180deg, var(--accent-bright), var(--accent)); color:#1a1300; border-color:transparent; width:56px; font-size:20px; }
+
+  /* Confetti khi trả hết (Phase 11) */
+  .confetti { position:fixed; inset:0; pointer-events:none; z-index:90; overflow:hidden; }
+  .confetti i { position:absolute; top:-12px; width:9px; height:14px; border-radius:2px; opacity:.9; animation:confDrop 2.4s ease-in forwards; }
+  @keyframes confDrop { to { transform:translateY(105vh) rotate(540deg); opacity:0; } }
+
+  /* ── Toast ───────────────────────────────────────────────── */
+  .toasts { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); z-index:80; display:flex; flex-direction:column; gap:8px; width:calc(100% - 32px); max-width:420px; }
+  .toast {
+    padding:11px 15px; border-radius:11px; font-size:14px; font-weight:600; color:#fff;
+    box-shadow:0 8px 24px rgba(0,0,0,.5); animation:toastIn .25s ease; border:1px solid rgba(255,255,255,.12);
+  }
+  .toast.err { background:#7f1d1d; } .toast.ok { background:#14532d; } .toast.info { background:#1e3a5f; }
+  @keyframes toastIn { from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none} }
+
+  /* ── Loading ─────────────────────────────────────────────── */
+  .loading { position:fixed; inset:0; z-index:60; display:grid; place-items:center; background:rgba(0,0,0,.4); backdrop-filter:blur(2px); }
+  .spinner { width:44px; height:44px; border-radius:50%; border:4px solid var(--hairline); border-top-color:var(--accent); animation:spin .8s linear infinite; }
+  @keyframes spin { to{ transform:rotate(360deg) } }
+
+  /* ── Modal: Lịch sử + tích lũy (Phase 9) ─────────────────── */
+  .modal { position:fixed; inset:0; z-index:70; display:flex; align-items:flex-start; justify-content:center; padding:24px 12px; overflow-y:auto; }
+  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.6); backdrop-filter:blur(3px); }
+  .modal-card {
+    position:relative; z-index:1; width:100%; max-width:560px; margin:auto;
+    background:var(--surface); border:1px solid var(--hairline); border-radius:18px;
+    box-shadow:0 20px 60px rgba(0,0,0,.6); animation:modalIn .25s ease;
+  }
+  @keyframes modalIn { from{ opacity:0; transform:translateY(14px) } to{ opacity:1; transform:none } }
+  .modal-head { display:flex; align-items:center; justify-content:space-between; padding:15px 18px; border-bottom:1px solid var(--hairline); }
+  .modal-head h2 { font-size:15px; letter-spacing:.5px; }
+  .modal-body { padding:16px 18px; display:flex; flex-direction:column; gap:20px; }
+  .hist-section h3 { margin:0 0 10px; font-size:12px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); font-weight:700; }
+
+  /* Đóng phiên (danger) */
+  .btn-danger { background:linear-gradient(180deg, #ff8080, #e23d3d); color:#2a0000; border-color:transparent; }
+  .hist-reset { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; background:var(--raised); border:1px solid var(--hairline); border-radius:12px; }
+  .hist-reset-info { display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .hist-reset-info b { font-size:13px; }
+  .hist-reset-info span { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .hist-reset-info i.warn { color:var(--loss); font-style:normal; font-weight:700; }
+  .hist-note { font-size:12px; color:var(--muted); padding:6px 2px 0; }
+  .hist-note.warn { color:var(--loss); font-weight:600; }
+
+  /* Bảng tích lũy */
+  .hist-cum { display:flex; flex-direction:column; }
+  .hcum-row { display:grid; grid-template-columns:34px 1fr auto; gap:10px; align-items:center; padding:10px 4px; border-bottom:1px solid var(--hairline); }
+  .hcum-row:last-child { border-bottom:0; }
+  .hcum-rank { text-align:center; font-weight:800; font-size:15px; color:var(--muted); }
+  .hcum-name { font-weight:700; font-size:14px; display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .hcum-name i { font-style:normal; font-size:11px; font-weight:600; color:var(--muted); }
+  .hcum-net { font-weight:800; font-variant-numeric:tabular-nums; font-size:14px; text-align:right; }
+  .hcum-net.win { color:var(--win); } .hcum-net.loss { color:var(--loss); } .hcum-net.zero { color:var(--muted); }
+
+  /* ── Thống kê theo kỳ (Phase 16) ─────────────────────────── */
+  .hist-sec-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+  .hist-sec-head h3 { margin:0; }
+  .seg { display:inline-flex; background:var(--raised); border:1px solid var(--hairline); border-radius:9px; padding:2px; gap:2px; }
+  .seg-btn { border:0; background:none; color:var(--muted); font-size:12px; font-weight:700; padding:5px 12px; border-radius:7px; cursor:pointer; }
+  .seg-btn.is-on { background:var(--accent); color:#fff; }
+  /* ── Bảng vinh danh (Phase 17) ───────────────────────────── */
+  .hist-awards { display:grid; grid-template-columns:repeat(auto-fill, minmax(158px, 1fr)); gap:8px; }
+  .award { display:flex; gap:9px; align-items:center; padding:10px 11px; background:var(--raised); border:1px solid var(--hairline); border-radius:12px; }
+  .award.win { border-color:rgba(61,220,132,.4); }
+  .award.loss { border-color:rgba(226,61,61,.4); }
+  .award-icon { font-size:24px; line-height:1; flex:0 0 auto; }
+  .award-body { min-width:0; }
+  .award-title { font-size:10px; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); font-weight:700; }
+  .award-name { font-size:14px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .award-detail { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .stat-dayfilter { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .stat-dayfilter label { font-size:12px; color:var(--muted); font-weight:700; }
+  .inp-sel { flex:0 1 auto; padding:7px 10px; cursor:pointer; }
+  .hist-stats { display:flex; flex-direction:column; gap:10px; }
+  .stat-period { background:var(--raised); border:1px solid var(--hairline); border-radius:12px; overflow:hidden; }
+  .stat-phead { display:flex; align-items:center; gap:8px; padding:9px 12px; background:rgba(0,0,0,.14); border-bottom:1px solid var(--hairline); flex-wrap:wrap; }
+  .stat-period.has-kids > .stat-phead { cursor:pointer; user-select:none; }
+  .stat-period.has-kids > .stat-phead:hover { background:rgba(0,0,0,.22); }
+  .stat-caret { font-size:11px; color:var(--muted); width:12px; }
+  .stat-phead b { font-size:13px; margin-right:auto; }
+  /* Bung chi tiết (drill-down 16.1) */
+  .stat-children { padding:8px 10px 10px; display:flex; flex-direction:column; gap:8px; background:rgba(0,0,0,.06); }
+  .stat-kidhead { font-size:11px; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); font-weight:700; }
+  .stat-children .stat-period { background:var(--bg); }
+  .stat-children .stat-phead { padding:7px 10px; }
+  .stat-children .stat-phead b { font-size:12px; }
+  .stat-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .stat-badge { font-size:11px; font-weight:800; padding:2px 7px; border-radius:999px; }
+  .stat-badge.cash { background:rgba(76,194,255,.16); color:#4CC2FF; }
+  .stat-badge.tour { background:rgba(255,194,71,.16); color:#FFC247; }
+  .stat-pot { font-size:12px; font-weight:700; color:var(--accent-bright); font-variant-numeric:tabular-nums; }
+  .stat-plist { display:flex; flex-direction:column; }
+  .stat-prow { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-bottom:1px solid var(--hairline); }
+  .stat-prow:last-child { border-bottom:0; }
+  .stat-pname { font-size:13px; font-weight:700; display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .stat-pname i { font-style:normal; font-size:11px; font-weight:600; color:var(--muted); }
+  .stat-pnet { font-weight:800; font-variant-numeric:tabular-nums; font-size:13px; white-space:nowrap; }
+  .stat-pnet.win { color:var(--win); } .stat-pnet.loss { color:var(--loss); } .stat-pnet.zero { color:var(--muted); }
+
+  /* Danh sách phiên */
+  .hist-sessions { display:flex; flex-direction:column; gap:8px; }
+  .hsess-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:10px 12px; background:var(--raised); border:1px solid var(--hairline); border-radius:10px; }
+  .hsess-main { display:flex; flex-direction:column; gap:2px; min-width:0; flex:1 1 auto; }
+  .hsess-main b { font-size:13px; }
+  .hsess-main span { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .hsess-pot { font-size:12px; font-weight:700; color:var(--accent-bright); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .hsess-reopen { flex:0 0 auto; border:1px solid var(--accent); background:none; color:var(--accent); font-size:12px; font-weight:700; padding:6px 10px; border-radius:8px; cursor:pointer; white-space:nowrap; }
+  .hsess-reopen:hover { background:var(--accent); color:#fff; }
+  .hsess-carry { flex:0 0 auto; border:1px solid var(--accent); background:var(--accent); color:#1a1205; font-size:12px; font-weight:800; padding:6px 10px; border-radius:8px; cursor:pointer; white-space:nowrap; }
+  .hsess-carry:hover { filter:brightness(1.12); }
+  /* Xoá phiên (Phase 23) */
+  .hsess-tools { display:flex; gap:6px; flex-wrap:wrap; }
+  .hsess-delall { font-size:12px; padding:5px 10px; border-color:var(--loss); color:var(--loss); }
+  .hsess-delall:hover { background:rgba(255,93,93,.12); }
+  .hsess-del { flex:0 0 auto; border:1px solid var(--hairline); background:none; color:var(--muted);
+    font-size:13px; padding:6px 9px; border-radius:8px; cursor:pointer; line-height:1; }
+  .hsess-del:hover { border-color:var(--loss); color:var(--loss); background:rgba(255,93,93,.1); }
+  body.locked .hsess-reopen, body.locked .hsess-carry,
+  body.locked .hsess-del, body.locked .hsess-delall { display:none !important; }
+  .hist-empty { padding:22px; text-align:center; color:var(--muted); font-size:14px; line-height:1.6; }
+  .hist-loading { padding:16px; text-align:center; color:var(--muted); }
+
+  /* ── Chia side pot / all-in (Phase 19) ───────────────────── */
+  .allin-hint { font-size:12px; color:var(--muted); line-height:1.5; }
+  .allin-rows { display:flex; flex-direction:column; gap:6px; }
+  .allin-row { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; padding:8px 10px; background:var(--raised); border:1px solid var(--hairline); border-radius:10px; }
+  .allin-pick { display:flex; align-items:center; gap:6px; font-weight:700; font-size:14px; cursor:pointer; min-width:110px; }
+  .allin-pick input { width:auto; }
+  .allin-have { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .allin-f { display:flex; align-items:center; gap:5px; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin-left:auto; }
+  .allin-f input { width:64px; padding:5px 7px; text-align:center; border-radius:8px; border:1px solid var(--hairline); background:var(--bg); color:var(--chip); font-weight:800; font-variant-numeric:tabular-nums; outline:none; }
+  .allin-f input:focus { border-color:var(--chip); }
+  .allin-result { display:flex; flex-direction:column; gap:8px; }
+  .allin-note { font-size:12px; color:var(--muted); padding:6px 2px; }
+  .allin-pots { display:flex; flex-direction:column; gap:4px; padding:10px 12px; background:var(--bg); border:1px solid var(--hairline); border-radius:10px; }
+  .allin-pot { display:flex; justify-content:space-between; gap:10px; font-size:13px; font-variant-numeric:tabular-nums; }
+  .allin-pot b { color:var(--accent-bright); } .allin-pot .ap-win { color:var(--win); font-weight:700; }
+  .allin-res-list { display:flex; flex-direction:column; }
+  .allin-res-row { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; padding:8px 4px; border-bottom:1px solid var(--hairline); font-size:13px; }
+  .allin-res-row:last-child { border-bottom:0; }
+  .arn-name { font-weight:700; min-width:80px; }
+  .arn-flow { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .arn-new { font-variant-numeric:tabular-nums; font-weight:700; }
+  .arn-new b { font-size:15px; } .arn-new.win { color:var(--win); } .arn-new.loss { color:var(--loss); } .arn-new.zero { color:var(--muted); }
+  .allin-actions { display:flex; justify-content:flex-end; }
+
+  /* ── Mua chip của người khác (Phase 24) ──────────────────── */
+  .xfer-hint { font-size:12.5px; line-height:1.6; color:var(--muted); }
+  .xfer-hint b { color:var(--text); }
+  .xfer-lbl { display:flex; flex-direction:column; gap:5px; font-size:11px; letter-spacing:.4px;
+    text-transform:uppercase; color:var(--muted); font-weight:600; }
+  .xfer-preview { font-size:13px; line-height:1.7; padding:11px 13px; border-radius:10px;
+    border:1px solid var(--hairline); background:var(--raised); font-variant-numeric:tabular-nums; min-height:1em; }
+  .xfer-preview b { color:var(--text); font-weight:700; }
+  .xfer-preview .up { color:var(--win); } .xfer-preview .down { color:var(--loss); }
+  .xfer-preview.bad { border-color:var(--loss); color:var(--loss); }
+  .xfer-actions { display:flex; justify-content:flex-end; }
+
+  /* ── Nhập bù phiên cũ (Phase 22) ─────────────────────────── */
+  .bf-open-btn { font-size:12px; padding:5px 10px; }
+  .bf-hint { font-size:12.5px; line-height:1.6; color:var(--muted); }
+  .bf-hint b { color:var(--text); }
+  .bf-warn { font-size:12px; line-height:1.6; color:var(--loss); padding:9px 11px; border-radius:10px;
+    border:1px solid var(--loss); background:rgba(255,93,93,.08); }
+  .bf-warn b { color:var(--text); }
+  .bf-date { display:flex; flex-direction:column; gap:5px; font-size:11px; letter-spacing:.4px;
+    text-transform:uppercase; color:var(--muted); font-weight:600; }
+  .bf-date .inp { max-width:200px; }
+  .bf-roster { min-height:0; }
+  .bf-rows { display:flex; flex-direction:column; gap:8px; }
+  .bf-row { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) 30px; gap:6px; align-items:center; }
+  .bf-row .inp { font-size:14px; padding:8px 9px; }
+  .bf-del { width:30px; height:30px; border:1px solid var(--hairline); background:var(--raised);
+    color:var(--muted); border-radius:8px; font-size:13px; line-height:1; cursor:pointer; }
+  .bf-del:hover { color:var(--loss); border-color:var(--loss); }
+  .bf-head { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) 30px; gap:6px;
+    font-size:10px; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); font-weight:700; }
+  .bf-sum { font-size:13px; font-weight:700; padding:9px 11px; border-radius:10px;
+    border:1px solid var(--hairline); background:var(--raised); font-variant-numeric:tabular-nums; }
+  .bf-sum.ok { color:var(--win); border-color:var(--win); }
+  .bf-sum.bad { color:var(--loss); border-color:var(--loss); }
+  .bf-actions { display:flex; justify-content:flex-end; }
+
+  /* ── Đếm chip cả bàn (Phase 25) ──────────────────────────── */
+  .cnt-hint { font-size:12.5px; line-height:1.6; color:var(--muted); }
+  .cnt-hint b { color:var(--text); }
+  .cnt-rows { display:flex; flex-direction:column; }
+  .cnt-row { display:grid; grid-template-columns:34px minmax(0,1fr) 120px; gap:10px; align-items:center;
+    padding:8px 4px; border-bottom:1px solid var(--hairline); cursor:text; }
+  .cnt-row:last-child { border-bottom:0; }
+  .cnt-row.out { opacity:.55; }
+  .cnt-av { width:34px; height:34px; border-radius:10px; display:grid; place-items:center; font-weight:800;
+    font-size:14px; color:#0b0b0b; background:var(--c,#888); box-shadow:0 2px 6px rgba(0,0,0,.35); }
+  .cnt-name { font-weight:700; font-size:14px; display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .cnt-name i { font-style:normal; font-size:11px; font-weight:600; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .cnt-inp { width:100%; padding:8px 10px; text-align:right; border-radius:9px; border:1px solid var(--hairline);
+    background:var(--bg); color:var(--chip); font-weight:800; font-size:16px; font-variant-numeric:tabular-nums; outline:none; }
+  .cnt-inp:focus { border-color:var(--chip); }
+  .cnt-inp:disabled { opacity:.5; cursor:not-allowed; }
+  .cnt-row.changed .cnt-inp { border-color:var(--accent); box-shadow:0 0 0 2px rgba(212,175,55,.18); }
+  .cnt-sum { font-size:13px; font-weight:600; padding:9px 11px; border-radius:10px; line-height:1.5;
+    border:1px solid var(--hairline); background:var(--raised); font-variant-numeric:tabular-nums; }
+  .cnt-sum b { font-weight:800; }
+  .cnt-sum.ok { color:var(--win); border-color:var(--win); }
+  .cnt-sum.bad { color:var(--loss); border-color:var(--loss); }
+  .cnt-actions { display:flex; justify-content:flex-end; gap:8px; }
+
+  /* ── Biểu đồ diễn biến lời/lỗ (Phase 21) — port từ weekly-chart/Dialog.html, ── */
+  /*    scope dưới .wc + map sang biến theme của app (felt/vault/neon).            */
+  .modal-card.modal-wide { max-width:920px; }
+  .wc-state { padding:26px; text-align:center; color:var(--muted); font-size:14px; line-height:1.6; }
+  .wc-weeks { display:flex; align-items:center; gap:8px; }
+  .wc-weeks .inp-sel { flex:1 1 auto; min-width:0; font-weight:700; }
+  .wc-nav { flex:0 0 auto; width:34px; height:34px; border:1px solid var(--hairline); background:var(--raised);
+    color:var(--text); border-radius:9px; font-size:12px; cursor:pointer; }
+  .wc-nav:hover:not(:disabled) { border-color:var(--accent); }
+  .wc-nav:disabled { opacity:.35; cursor:not-allowed; }
+  .wc {
+    --wc-up:var(--win); --wc-down:var(--loss); --wc-flat:var(--muted);
+    font-variant-numeric:tabular-nums; -webkit-font-smoothing:antialiased;
+  }
+  .wc-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 12px; }
+  .wc-title { margin:0; font-size:clamp(15px,2.4vw,18px); font-weight:700; letter-spacing:-.01em; color:var(--text); text-transform:none; }
+  .wc-wk { font-size:12px; color:var(--muted); }
+  .wc-insight { font-size:13px; line-height:1.5; color:var(--muted); margin:8px 0 0; max-width:66ch; }
+  .wc-insight b { color:var(--text); font-weight:600; }
+
+  .wc-tiles { display:flex; flex-wrap:wrap; gap:10px; margin:14px 0 6px; }
+  .wc-tile { flex:1 1 150px; min-width:132px; background:var(--raised); border:1px solid var(--hairline); border-radius:12px; padding:10px 13px; }
+  .wc-tile .lab { font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .wc-tile .val { font-size:19px; font-weight:700; margin-top:3px; line-height:1.15; color:var(--text); }
+  .wc-tile .sub { font-size:12px; color:var(--muted); margin-top:2px; }
+  .wc-tile.up .val { color:var(--wc-up); } .wc-tile.down .val { color:var(--wc-down); }
+
+  .wc-chartbox { position:relative; margin-top:8px; }
+  .wc svg { display:block; width:100%; height:auto; touch-action:none; }
+  .wc-line { fill:none; stroke:var(--wc-flat); stroke-width:1.7; stroke-linejoin:round; stroke-linecap:round; opacity:.5; transition:opacity .12s, stroke-width .12s; }
+  .wc-grp.up .wc-line { stroke:var(--wc-up); } .wc-grp.down .wc-line { stroke:var(--wc-down); } .wc-grp.flat .wc-line { stroke:var(--wc-flat); }
+  .wc-dot { opacity:0; transition:opacity .12s; }
+  .wc-grp.up .wc-dot { fill:var(--wc-up); } .wc-grp.down .wc-dot { fill:var(--wc-down); } .wc-grp.flat .wc-dot { fill:var(--wc-flat); }
+  .wc-enddot { stroke:var(--surface); stroke-width:2; }
+  .wc-grp.up .wc-enddot { fill:var(--wc-up); } .wc-grp.down .wc-enddot { fill:var(--wc-down); } .wc-grp.flat .wc-enddot { fill:var(--wc-flat); }
+  .wc-endlab { font-size:11px; font-weight:600; dominant-baseline:middle; }
+  .wc-grp.up .wc-endlab { fill:var(--wc-up); } .wc-grp.down .wc-endlab { fill:var(--wc-down); } .wc-grp.flat .wc-endlab { fill:var(--muted); }
+  .wc-leader { stroke:var(--hairline); stroke-width:1; opacity:.7; }
+
+  #wcChartbox.has-focus .wc-grp:not(.focus) .wc-line { opacity:.12; stroke-width:1.4; }
+  #wcChartbox.has-focus .wc-grp:not(.focus) .wc-endlab { opacity:.25; }
+  #wcChartbox.has-focus .wc-grp:not(.focus) .wc-enddot { opacity:.28; }
+  #wcChartbox.has-focus .wc-grp:not(.focus) .wc-leader { opacity:.12; }
+  .wc-grp.focus .wc-line { opacity:1; stroke-width:2.6; }
+  .wc-grp.focus .wc-dot { opacity:1; }
+  .wc-grp.focus .wc-endlab { font-weight:700; }
+  .wc-grp.hidden { display:none; }
+
+  .wc-grid line { stroke:var(--hairline); stroke-width:1; opacity:.6; }
+  .wc-grid line.zero { stroke:var(--muted); opacity:.55; }
+  .wc-baseline { stroke:var(--muted); stroke-width:1.2; stroke-dasharray:2 4; opacity:.7; }
+  .wc-tick { fill:var(--muted); font-size:11px; }
+  .wc-xtick { fill:var(--muted); font-size:11.5px; text-anchor:middle; }
+  .wc-baselab { fill:var(--muted); font-size:10.5px; }
+  .wc-crosshair { stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; opacity:0; }
+
+  .wc-tip { position:absolute; pointer-events:none; z-index:5; opacity:0; transition:opacity .1s;
+    background:var(--raised); border:1px solid var(--hairline); border-radius:10px;
+    box-shadow:0 6px 22px rgba(0,0,0,.5); padding:9px 11px; min-width:158px; font-size:12.5px; color:var(--text); }
+  .wc-tip.on { opacity:1; }
+  .wc-tip .th { font-weight:700; font-size:12.5px; margin-bottom:5px; display:flex; justify-content:space-between; gap:12px; }
+  .wc-tip .th .d { color:var(--muted); font-weight:500; }
+  .wc-tip .row { display:flex; justify-content:space-between; gap:14px; line-height:1.65; }
+  .wc-tip .row .nm { color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
+  .wc-tip .row.me .nm { color:var(--text); font-weight:700; }
+  .wc-tip .row .vv { font-weight:600; }
+  .wc-tip .up { color:var(--wc-up); } .wc-tip .down { color:var(--wc-down); } .wc-tip .flat { color:var(--muted); }
+  .wc-tip .big { font-size:15px; font-weight:700; margin:1px 0 4px; }
+  .wc-tip .meta { color:var(--muted); font-size:12px; line-height:1.6; }
+
+  .wc-legend { display:flex; flex-wrap:wrap; gap:6px 8px; margin-top:14px; }
+  .wc-chip { display:inline-flex; align-items:center; gap:7px; padding:5px 10px 5px 8px; border-radius:999px;
+    border:1px solid var(--hairline); background:var(--raised); cursor:pointer; font-size:12.5px; user-select:none; transition:opacity .12s; }
+  .wc-chip:hover { border-color:var(--accent); }
+  .wc-chip .sw { width:12px; height:12px; border-radius:3px; flex:0 0 auto; }
+  .wc-chip.up .sw { background:var(--wc-up); } .wc-chip.down .sw { background:var(--wc-down); } .wc-chip.flat .sw { background:var(--wc-flat); }
+  .wc-chip .cn { color:var(--text); white-space:nowrap; }
+  .wc-chip .cnet { color:var(--muted); font-size:12px; }
+  .wc-chip.up .cnet { color:var(--wc-up); } .wc-chip.down .cnet { color:var(--wc-down); }
+  .wc-chip.off { opacity:.4; } .wc-chip.off .sw { background:var(--muted)!important; }
+
+  .wc-bar { display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; margin-top:12px; }
+  .wc-hint { flex:1 1 200px; font-size:12px; color:var(--muted); line-height:1.5; }
+  .wc-lnk { background:var(--raised); border:1px solid var(--hairline); color:var(--text); font:inherit; font-size:12.5px;
+    padding:5px 11px; border-radius:8px; cursor:pointer; }
+  .wc-lnk:hover { border-color:var(--accent); }
+
+  .wc-tblwrap { margin-top:12px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .wc-tblwrap table { border-collapse:collapse; width:100%; font-size:12.5px; }
+  .wc-tblwrap th, .wc-tblwrap td { padding:6px 9px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--hairline); }
+  .wc-tblwrap th:first-child, .wc-tblwrap td:first-child { text-align:left; position:sticky; left:0; background:var(--surface); }
+  .wc-tblwrap thead th { color:var(--muted); font-weight:600; }
+  .wc-tblwrap td.net.up { color:var(--wc-up); } .wc-tblwrap td.net.down { color:var(--wc-down); }
+  .wc-hidden { display:none; }
+
+  /* ── Responsive ──────────────────────────────────────────── */
+  @media (max-width:560px) {
+    .brand .sub { display:none; }
+    .player { flex-wrap:wrap; }
+    .p-net { min-width:0; margin-left:auto; }
+    .stat .v { font-size:16px; }
+    .settle-row { grid-template-columns:1fr 24px auto; grid-template-areas:"from arrow amt" "to to paid"; }
+    .s-to { margin-top:6px; } .s-paid { margin-top:6px; }
+    .cfg-form { grid-template-columns:1fr; }
+    .wc-tile { flex:1 1 46%; min-width:0; } .wc-endlab { font-size:10px; }
+    .bf-row { grid-template-columns:minmax(0,1fr) minmax(0,1fr) 30px; grid-template-areas:"nm nm del" "buy end del"; }
+    .bf-row .bf-name { grid-area:nm; } .bf-row .bf-buy { grid-area:buy; } .bf-row .bf-end { grid-area:end; }
+    .bf-row .bf-del { grid-area:del; }
+    .bf-head { display:none; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+</style>
+
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="suit">♠<span class="red">♥</span></span> POKER LEDGER
+      <span class="sub">Home Cash Game</span>
+    </div>
+    <div class="topbar-right">
+      <span class="live"><i class="dot"></i> LIVE <span id="synced" class="synced"></span></span>
+      <button id="allinBtn" class="icon-btn" title="Chia pot khi all-in nhiều người">💥</button>
+      <button id="xferBtn" class="icon-btn" title="Mua chip của người khác (khi chạm trần buy-in)">💱</button>
+      <button id="histBtn" class="icon-btn" title="Lịch sử &amp; bảng tích lũy">📊</button>
+      <button id="chartBtn" class="icon-btn" title="Biểu đồ diễn biến lời/lỗ qua các phiên">📈</button>
+      <button id="lockBtn" class="icon-btn" title="Nhập passcode để sửa" hidden>🔒</button>
+      <button id="themeBtn" class="icon-btn" title="Đổi theme">🎨</button>
+    </div>
+  </header>
+
+  <main id="app">
+    <!-- (a) Config bar + panel sửa cấu hình -->
+    <section class="config-bar card">
+      <div class="config-top">
+        <div id="configSummary" style="flex:1 1 auto"></div>
+        <button id="cfgEditBtn" class="cfg-edit-btn" title="Sửa cấu hình">✎</button>
+      </div>
+      <form id="cfgForm" class="cfg-form" hidden autocomplete="off">
+        <label>Buy-in mặc định (điểm) <span id="cfgBuyInVND" class="cfg-note"></span><input id="cfgBuyIn" class="inp" inputmode="numeric"></label>
+        <label>Small blind (điểm) <span id="cfgSBVnd" class="cfg-note"></span><input id="cfgSB" class="inp" inputmode="numeric"></label>
+        <label>Big blind (điểm) <span id="cfgBBVnd" class="cfg-note"></span><input id="cfgBB" class="inp" inputmode="numeric"></label>
+        <label>Trần buy-in từ quỹ / người (điểm) <span class="cfg-note">0 = không giới hạn · chạm trần thì mua chip của người khác</span><input id="cfgMaxBuyIn" class="inp" inputmode="numeric" placeholder="0"></label>
+        <div class="cfg-sec">🎰 Chip</div>
+        <label>Hệ số nhân · 1 điểm = (₫) <span class="cfg-note">đổi được mọi lúc</span><input id="cfgRatio" class="inp" inputmode="numeric"></label>
+        <label>Mệnh giá chip (điểm) <span class="cfg-note">vd 5,10,20,25,50,100</span><input id="cfgDenoms" class="inp" placeholder="5,10,20,25,50,100"></label>
+        <label>Kiểu chơi<select id="cfgGameType" class="inp"><option value="cash">💵 Cash game</option><option value="tournament">🏆 Tournament</option></select></label>
+        <label id="cfgPayoutWrap" hidden>Chia thưởng theo hạng (%) <span class="cfg-note">vd 50,30,20</span><input id="cfgPayout" class="inp" placeholder="50,30,20"></label>
+        <label id="cfgBlindWrap" hidden>Cấu trúc blind (đồng hồ) <span class="cfg-note">"SB/BB/phút" · nghỉ = "B/phút"</span><textarea id="cfgBlind" class="inp" rows="3" placeholder="5/10/20,10/20/20,B/10,25/50/20,..."></textarea></label>
+        <label>Passcode <span class="cfg-note">(gõ để đặt/đổi · trống = giữ nguyên)</span><input id="cfgPass" class="inp" placeholder="••••"></label>
+        <label class="cfg-check"><input type="checkbox" id="cfgClearPass"> Gỡ passcode (cho ai cũng sửa)</label>
+        <div class="cfg-form-actions">
+          <button type="submit" class="btn btn-accent">Lưu cấu hình</button>
+          <button type="button" id="cfgCancel" class="btn btn-ghost">Hủy</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Đồng hồ blind (Phase 14) — chỉ hiện ở mode tournament -->
+    <section class="panel clock-panel" id="clockPanel" hidden>
+      <div class="clock-face">
+        <div class="clock-lvl" id="clockLvl"></div>
+        <div class="clock-time" id="clockTime">--:--</div>
+        <div class="clock-blinds" id="clockBlinds"></div>
+        <div class="clock-next" id="clockNext"></div>
+      </div>
+      <div class="clock-ctrls" id="clockCtrls">
+        <button class="clk-btn" data-clk="prev" title="Level trước">⏮</button>
+        <button class="clk-btn clk-play" data-clk="toggle" title="Chạy / Dừng">▶</button>
+        <button class="clk-btn" data-clk="next" title="Level sau">⏭</button>
+        <button class="clk-btn" data-clk="reset" title="Reset về đầu">⟳</button>
+      </div>
+    </section>
+
+    <!-- (b) Players panel -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Người chơi</h2>
+        <div class="panel-actions">
+          <button id="countBtn" class="btn btn-ghost" title="Nhập chip còn lại của CẢ BÀN trong 1 lần (cuối buổi)">🧮 Đếm chip</button>
+          <button id="addBtn" class="btn btn-accent">+ Thêm</button>
+        </div>
+      </div>
+
+      <form id="addForm" class="add-form" hidden autocomplete="off">
+        <!-- Chế độ 1 người -->
+        <div id="addSingle" class="add-row">
+          <input id="addName" class="inp" placeholder="Tên người chơi" maxlength="24">
+          <input id="addBuyIn" class="inp inp-money" inputmode="numeric" placeholder="Buy-in (điểm)">
+          <button type="submit" class="btn btn-accent">Vào bàn</button>
+          <button type="button" id="addCancel" class="btn btn-ghost">Hủy</button>
+        </div>
+        <!-- Chế độ hàng loạt (Phase 15) -->
+        <div id="addBulk" class="add-bulk" hidden>
+          <textarea id="addBulkNames" class="inp inp-bulk" rows="4"
+            placeholder="Mỗi dòng 1 tên (hoặc ngăn bởi dấu phẩy):&#10;An&#10;Bình, Cường&#10;Dũng"></textarea>
+          <div class="add-bulk-foot">
+            <input id="addBulkBuyIn" class="inp inp-money" inputmode="numeric" placeholder="Buy-in (điểm) chung">
+            <span id="addBulkCount" class="add-bulk-count">0 tên</span>
+            <button type="button" id="addBulkGo" class="btn btn-accent">Thêm tất cả</button>
+            <button type="button" id="addBulkCancel" class="btn btn-ghost">Hủy</button>
+          </div>
+        </div>
+        <button type="button" id="bulkToggle" class="add-link">📋 Nhập danh sách nhiều người</button>
+        <div id="addHint" class="add-hint"></div>
+      </form>
+
+      <div id="playerList" class="player-list"></div>
+      <div id="emptyState" class="empty" hidden>
+        Chưa có ai vào bàn.<br>Bấm <b>+ Thêm</b> để bắt đầu 🎲
+      </div>
+    </section>
+
+    <!-- (c) Rank / Leaderboard -->
+    <section class="panel" id="lbPanel" hidden>
+      <div class="panel-head">
+        <h2>Xếp hạng · Lời-Lỗ</h2>
+        <span class="lb-legend">▲ <i class="win">lời</i> · ▼ <i class="loss">lỗ</i></span>
+      </div>
+      <div id="lbList" class="lb-list"></div>
+    </section>
+
+    <!-- (d) Settlement · Ai trả ai -->
+    <section class="panel" id="settlePanel" hidden>
+      <div class="panel-head">
+        <h2>Chia tiền · Ai trả ai</h2>
+        <span id="settleMeta" class="settle-meta"></span>
+      </div>
+      <div id="settleBody"></div>
+    </section>
+  </main>
+
+  <!-- Modal: Lịch sử + bảng xếp hạng tích lũy (Phase 9) -->
+  <div id="histModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>📊 Lịch sử &amp; Tích lũy</h2>
+        <button id="histClose" class="icon-btn" title="Đóng">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="histResetBar"></div>
+        <div class="hist-section">
+          <h3>🏅 Bảng vinh danh</h3>
+          <div id="histAwards" class="hist-awards"></div>
+        </div>
+        <div class="hist-section">
+          <h3>Bảng xếp hạng tích lũy</h3>
+          <div id="histCumulative" class="hist-cum"></div>
+        </div>
+        <div class="hist-section">
+          <div class="hist-sec-head">
+            <h3>Thống kê theo kỳ</h3>
+            <div id="statGran" class="seg" role="tablist">
+              <button class="seg-btn" data-gran="day">Ngày</button>
+              <button class="seg-btn is-on" data-gran="week">Tuần</button>
+              <button class="seg-btn" data-gran="month">Tháng</button>
+            </div>
+          </div>
+          <div id="statDayWrap" class="stat-dayfilter" hidden>
+            <label>Chọn ngày</label>
+            <select id="statDay" class="inp inp-sel"></select>
+          </div>
+          <div id="histStats" class="hist-stats"></div>
+        </div>
+        <div class="hist-section">
+          <div class="hist-sec-head">
+            <h3>Các phiên đã lưu</h3>
+            <div class="hsess-tools">
+              <button id="bfOpen" class="btn btn-ghost bf-open-btn" title="Nhập bù một buổi đã chơi nhưng quên ghi">⏪ Nhập bù phiên cũ</button>
+              <button id="delAllBtn" class="btn btn-ghost hsess-delall" title="Xoá toàn bộ lịch sử phiên (không hoàn tác)">🗑 Xoá tất cả</button>
+            </div>
+          </div>
+          <div id="histSessions" class="hist-sessions"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Chia side pot khi all-in nhiều người (Phase 19) -->
+  <div id="allinModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>💥 Chia pot (all-in)</h2>
+        <button id="allinClose" class="icon-btn" title="Đóng">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="allin-hint">Tích những người <b>all-in</b>, sửa số chip đã bỏ vào pot &amp; xếp <b>hạng bài</b> (1 = mạnh nhất · hòa = cùng số). App chia side pot rồi tính lại chip.</div>
+        <div id="allinRows" class="allin-rows"></div>
+        <div id="allinResult" class="allin-result"></div>
+        <div class="allin-actions">
+          <button id="allinApply" class="btn btn-accent" data-act="apply">✅ Áp dụng vào bàn</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Mua chip của người khác (Phase 24) — chuyển chip A↔B, giữ zero-sum -->
+  <div id="xferModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>💱 Mua chip của người khác</h2>
+        <button id="xferClose" class="icon-btn" title="Đóng">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="xfer-hint">
+          Dùng khi ai đó <b>chạm trần buy-in từ quỹ</b> → mua chip của người còn nhiều thay vì nạp thêm.
+          Chip chỉ <b>dịch từ người bán sang người mua</b> (không sinh chip mới), tiền gộp vào quyết toán cuối buổi.
+        </div>
+        <label class="xfer-lbl">Người MUA (nhận chip, trả tiền)
+          <select id="xferBuyer" class="inp inp-sel"></select>
+        </label>
+        <label class="xfer-lbl">Người BÁN (mất chip, nhận tiền)
+          <select id="xferSeller" class="inp inp-sel"></select>
+        </label>
+        <label class="xfer-lbl">Số điểm chip
+          <input id="xferPts" class="inp inp-money" inputmode="numeric" placeholder="vd 2000">
+        </label>
+        <div id="xferPreview" class="xfer-preview"></div>
+        <div class="xfer-actions">
+          <button id="xferGo" class="btn btn-accent">💱 Xác nhận chuyển</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Đếm chip cả bàn (Phase 25) — nhập chip nhiều người 1 lần, 1 round-trip -->
+  <div id="countModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>🧮 Đếm chip cả bàn</h2>
+        <button id="cntClose" class="icon-btn" title="Đóng">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="cnt-hint">
+          Điền <b>tổng điểm chip còn lại</b> của từng người rồi bấm <b>Lưu</b> một lần —
+          không phải chờ app sau mỗi ô. <b>Enter</b> = sang người kế · ô để trống = giữ nguyên.
+        </div>
+        <div id="cntRows" class="cnt-rows"></div>
+        <div id="cntSum" class="cnt-sum"></div>
+        <div class="cnt-actions">
+          <button id="cntCancel" class="btn btn-ghost">Hủy</button>
+          <button id="cntSave" class="btn btn-accent">💾 Lưu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Nhập bù phiên cũ (Phase 22) — ghi thẳng vào lịch sử, KHÔNG đụng bàn đang chơi -->
+  <div id="backfillModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>⏪ Nhập bù phiên cũ</h2>
+        <button id="bfClose" class="icon-btn" title="Đóng">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="bf-hint">
+          Ghi thẳng vào lịch sử một buổi <b>đã chơi nhưng quên nhập</b>. <b>Không đụng</b> bàn đang chơi.
+          Nhập theo <b>ĐIỂM chip</b> — <b>Σ buy-in phải bằng Σ chip cuối</b> (chip không tự sinh ra).
+        </div>
+        <div class="bf-warn">
+          ⚠️ <b>Chỉ nhập bù ngày CHƯA có phiên nào.</b> Nếu ngày đó bạn đã chơi tiếp sang hôm sau trên
+          <b>cùng một bàn</b> rồi mới đóng, thì nó đã được lưu chung vào phiên hôm sau —
+          <b>đừng nhập bù</b> kẻo bị tính 2 lần. Chơi nhiều ngày thì cuối mỗi ngày bấm
+          <b>Đóng phiên → ▶ Ngày mới</b>.
+        </div>
+        <label class="bf-date">Ngày đã chơi
+          <input type="date" id="bfDate" class="inp">
+        </label>
+        <div class="bf-roster">
+          <button type="button" id="bfFill" class="add-link" hidden></button>
+        </div>
+        <div id="bfRows" class="bf-rows"></div>
+        <button type="button" id="bfAddRow" class="add-link">+ Thêm người</button>
+        <div id="bfSum" class="bf-sum"></div>
+        <div class="bf-actions">
+          <button id="bfSave" class="btn btn-accent">💾 Lưu vào lịch sử</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Biểu đồ diễn biến lời/lỗ qua các phiên (Phase 21) — dữ liệu từ getWeeklyChart() -->
+  <div id="chartModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card modal-wide">
+      <div class="modal-head">
+        <h2>📈 Diễn biến lời/lỗ</h2>
+        <button id="chartClose" class="icon-btn" title="Đóng">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="wc-weeks" id="wcWeeks" hidden>
+          <button type="button" id="wcPrev" class="wc-nav" title="Tuần trước">◀</button>
+          <select id="wcWeekSel" class="inp inp-sel"></select>
+          <button type="button" id="wcNext" class="wc-nav" title="Tuần sau">▶</button>
+        </div>
+        <div id="wcState" class="wc-state">Đang tải…</div>
+        <div class="wc" id="wcApp" hidden>
+          <div class="wc-head">
+            <h3 class="wc-title">Diễn biến chip qua các phiên</h3>
+            <span class="wc-wk" id="wcWk"></span>
+          </div>
+          <p class="wc-insight" id="wcInsight"></p>
+          <div class="wc-tiles" id="wcTiles"></div>
+          <div class="wc-chartbox" id="wcChartbox">
+            <svg id="wcSvg" role="img" aria-label="Biểu đồ đường diễn biến lời/lỗ của từng người qua các phiên đã đóng"></svg>
+            <div class="wc-tip" id="wcTip"></div>
+          </div>
+          <div class="wc-legend" id="wcLegend"></div>
+          <div class="wc-bar">
+            <span class="wc-hint">Di chuột / chạm lên biểu đồ để làm nổi 1 người &amp; xem xếp hạng · bấm chú thích để ẩn/hiện.</span>
+            <button class="wc-lnk" id="wcTblBtn" aria-expanded="false">Xem bảng số liệu</button>
+          </div>
+          <div class="wc-tblwrap wc-hidden" id="wcTblwrap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts" class="toasts"></div>
+  <div id="loading" class="loading" hidden><div class="spinner"></div></div>
+
+  <script>window.POKER_API="https://script.google.com/macros/s/AKfycbzi1dZmYKtWEeIwiB8RiWXSeX3WMcWFRLt5Qnn094bYLxd9mNYT0Hf7tXw6F7pjwynN/exec";</script>
+  <script>
+  // Giao tiếp server qua srun(): google.script.run khi chạy trong /exec, fetch JSON khi chạy ở trang tĩnh (P26).
+  var STATE = null;
+  var localRevision = null;
+  var passcode = '';           // passcode đang giữ (từ localStorage / vừa nhập)
+  try { passcode = localStorage.getItem('pokerPasscode') || ''; } catch (e) {}
+  var unlocked = false;        // true khi passcode đã xác thực (hoặc Config không đặt)
+  var passTried = false;       // đã thử passcode lưu sẵn chưa
+  var mutating = 0;            // >0: đang ghi -> tạm dừng poll re-render
+  var settleCelebrated = false; // đã bắn confetti cho lần "trả hết" hiện tại chưa
+  var dirtyChips = {};        // playerId -> đang gõ/đợi gửi -> render không đè input
+  var chipTimers = {};        // playerId -> debounce timer
+  var chipOpen = {};          // playerId -> đang mở editor chip theo mệnh giá
+  var THEMES = ['felt', 'vault', 'neon'];
+
+  function canEdit() { return !!(STATE && (!STATE.passcodeRequired || unlocked)); }
+
+  // ── Tiện ích ───────────────────────────────────────────────
+  function $(id) { return document.getElementById(id); }
+  function fmtVND(n) { return (Math.round(n) || 0).toLocaleString('vi-VN') + '₫'; }
+  function fmtSigned(n) { return (n > 0 ? '+' : n < 0 ? '−' : '') + fmtVND(Math.abs(n)); }
+  function fmtK(n) { n = Math.round(n); return Math.abs(n) >= 1000 && n % 1000 === 0 ? (n / 1000) + 'k' : n.toLocaleString('vi-VN'); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+  function initial(name) { return (name || '?').trim().charAt(0).toUpperCase(); }
+  function fmtDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+           ' ' + d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ── Chip model (client mirror của ChipModel.gs — GIỮ ĐỒNG BỘ với server) ──
+  function cParseDenoms(str) {
+    var seen = {}, out = [];
+    String(str == null ? '' : str).split(',').forEach(function (x) {
+      var n = Math.floor(Number(('' + x).trim()));
+      if (!isNaN(n) && n > 0 && !seen[n]) { seen[n] = true; out.push(n); }
+    });
+    out.sort(function (a, b) { return b - a; });
+    return out;
+  }
+  function cParseCounts(str) {
+    var m = {};
+    String(str == null ? '' : str).split(',').forEach(function (p) {
+      var kv = ('' + p).split(':'); if (kv.length !== 2) return;
+      var d = Math.floor(Number(kv[0].trim())), c = Math.floor(Number(kv[1].trim()));
+      if (!isNaN(d) && d > 0 && !isNaN(c) && c > 0) m[d] = (m[d] || 0) + c;
+    });
+    return m;
+  }
+  function cSerCounts(map) {
+    map = map || {};
+    return Object.keys(map).map(function (k) { return Math.floor(Number(k)); })
+      .filter(function (d) { return d > 0 && (Number(map[d]) || 0) > 0; })
+      .sort(function (a, b) { return b - a; })
+      .map(function (d) { return d + ':' + Math.floor(Number(map[d])); }).join(',');
+  }
+  function cCountsPts(map) { var s = 0; for (var d in (map || {})) s += (Number(d) || 0) * (Number(map[d]) || 0); return s; }
+  function cDistribute(points, denoms, recipe) {
+    points = Math.floor(Number(points) || 0);
+    if (points <= 0) return { counts: {}, remainder: 0 };
+    if (!denoms || !denoms.length) return { counts: {}, remainder: points };
+    var rTot = cCountsPts(recipe || {});
+    if (rTot > 0 && points % rTot === 0) {
+      var k = points / rTot, counts = {};
+      for (var d in recipe) { var c = Number(recipe[d]) || 0; if (c > 0) counts[d] = c * k; }
+      return { counts: counts, remainder: 0 };
+    }
+    var sorted = denoms.slice().sort(function (a, b) { return b - a; }), rem = points, out = {};
+    sorted.forEach(function (dd) { if (dd <= 0) return; var c = Math.floor(rem / dd); if (c > 0) { out[dd] = c; rem -= c * dd; } });
+    return { counts: out, remainder: rem };
+  }
+  /** {50:1,10:2} -> "1×50, 2×10" (denom giảm dần). */
+  function cBreakdownText(counts) {
+    var ds = cParseDenoms(Object.keys(counts || {}).join(','));
+    return ds.filter(function (d) { return (counts[d] || 0) > 0; }).map(function (d) { return counts[d] + '×' + d; }).join(', ');
+  }
+  function chipMult() { return Number((STATE && STATE.config && STATE.config.chipRatio) || 1); }
+  /** Mirror của SidePot.gs computeSidePots — chia side pot 1 all-in nhiều người. */
+  function cComputeSidePots(entries) {
+    var norm = (entries || []).map(function (e) {
+      return { id: e.id, contrib: Math.max(0, Math.round(Number(e.contrib) || 0)), rank: Math.round(Number(e.rank) || 0) };
+    });
+    var payouts = {}; norm.forEach(function (e) { payouts[e.id] = 0; });
+    var inPot = norm.filter(function (e) { return e.contrib > 0 && e.rank >= 1; });
+    var levels = [], seen = {};
+    inPot.forEach(function (e) { if (!seen[e.contrib]) { seen[e.contrib] = true; levels.push(e.contrib); } });
+    levels.sort(function (a, b) { return a - b; });
+    var pots = [], prev = 0;
+    levels.forEach(function (v) {
+      var eligible = inPot.filter(function (e) { return e.contrib >= v; });
+      var amount = (v - prev) * eligible.length; prev = v;
+      if (amount <= 0 || !eligible.length) return;
+      var bestRank = Math.min.apply(null, eligible.map(function (e) { return e.rank; }));
+      var winners = eligible.filter(function (e) { return e.rank === bestRank; });
+      var share = Math.floor(amount / winners.length), rem = amount - share * winners.length;
+      winners.forEach(function (w, i) { payouts[w.id] += share + (i < rem ? 1 : 0); });
+      pots.push({ amount: amount, winners: winners.map(function (w) { return w.id; }) });
+    });
+    return { payouts: payouts, pots: pots };
+  }
+
+  // ── Gọi server (bọc Promise) ───────────────────────────────
+  // 2 đường, cùng chữ ký srun(name, ...args):
+  //  (a) chạy TRONG /exec (HtmlService)  → google.script.run như trước.
+  //  (b) chạy ở trang TĨNH (GitHub Pages) → fetch POST JSON ẩn danh tới window.POKER_API
+  //      (= URL /exec, do dev-tools/build-static.js chèn). Không cookie ⇒ không dính
+  //      multi-account / Brave Shields. Server trả {ok, result | error} (Code.gs apiCall).
+  function hasScriptRun() { return !!(window.google && google.script && google.script.run); }
+  function srun(method) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    if (hasScriptRun()) {
+      return new Promise(function (resolve, reject) {
+        var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+        runner[method].apply(runner, args);
+      });
+    }
+    var api = window.POKER_API;
+    if (!api) return Promise.reject(new Error('Chưa cấu hình địa chỉ API (POKER_API).'));
+    return fetch(api, {
+      method: 'POST', redirect: 'follow', credentials: 'omit',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // text/plain = "simple request", không preflight
+      body: JSON.stringify({ fn: method, args: args }),
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var j; try { j = JSON.parse(t); } catch (e) { throw new Error('Server trả về không đúng định dạng (HTTP ' + r.status + ').'); }
+        if (!j || !j.ok) throw new Error((j && j.error) || 'Có lỗi xảy ra, thử lại.');
+        return j.result;
+      });
+    }, function () { throw new Error('Không kết nối được server — kiểm tra mạng rồi thử lại.'); });
+  }
+  function showLoading(on) { $('loading').hidden = !on; }
+  function toast(msg, type) {
+    var el = document.createElement('div');
+    el.className = 'toast ' + (type || 'info');
+    el.textContent = msg;
+    $('toasts').appendChild(el);
+    setTimeout(function () { el.style.opacity = '0'; setTimeout(function () { el.remove(); }, 300); }, 2600);
+  }
+  function onError(err) {
+    console.error(err);
+    toast((err && err.message) ? err.message : 'Có lỗi xảy ra, thử lại.', 'err');
+  }
+
+  // Bọc 1 mutation: khóa nút, spinner, render kết quả, toast lỗi.
+  function mutate(promise, okMsg) {
+    mutating++;
+    return promise.then(function (state) {
+      if (okMsg) toast(okMsg, 'ok');
+      render(state);
+    }).catch(onError).then(function () { mutating--; });
+  }
+
+  // ── Render ─────────────────────────────────────────────────
+  function render(state) {
+    STATE = state;
+    localRevision = state.revision;
+    serverOffset = (state.serverTime ? Date.parse(state.serverTime) : Date.now()) - Date.now();
+    renderConfig(state);
+    renderPlayers(state);
+    renderLeaderboard(state);
+    renderSettlement(state);
+    renderClock(state);
+    applyLockUI();
+    maybeAutoUnlock();
+    if (!$('histModal').hidden) renderResetBar();   // modal mở: cập nhật lại thanh đóng phiên
+    $('synced').textContent = '· đồng bộ ' + new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ── Passcode / khóa ────────────────────────────────────────
+  function applyLockUI() {
+    var required = !!(STATE && STATE.passcodeRequired);
+    var ok = !required || unlocked;
+    document.body.classList.toggle('locked', !ok);
+    var btn = $('lockBtn');
+    btn.hidden = !required;
+    if (required) {
+      btn.textContent = ok ? '🔓' : '🔒';
+      btn.title = ok ? 'Đang mở khóa — bấm để khóa lại' : 'Nhập passcode để chỉnh sửa';
+    }
+  }
+  function maybeAutoUnlock() {                 // thử passcode đã lưu (1 lần)
+    if (STATE.passcodeRequired && !unlocked && !passTried && passcode) {
+      passTried = true;
+      srun('checkPasscode', passcode).then(function (ok) {
+        if (ok) { unlocked = true; applyLockUI(); }
+        else { passcode = ''; try { localStorage.removeItem('pokerPasscode'); } catch (e) {} }
+      }).catch(function () {});
+    }
+  }
+  function onLockClick() {
+    if (!STATE || !STATE.passcodeRequired) return;
+    if (unlocked) {                            // khóa lại
+      unlocked = false; passcode = ''; try { localStorage.removeItem('pokerPasscode'); } catch (e) {}
+      applyLockUI(); toast('Đã khóa — chỉ xem.', 'info'); return;
+    }
+    var pc = prompt('Nhập passcode để chỉnh sửa:');
+    if (pc == null) return;
+    srun('checkPasscode', pc).then(function (ok) {
+      if (ok) {
+        passcode = pc; unlocked = true; passTried = true;
+        try { localStorage.setItem('pokerPasscode', pc); } catch (e) {}
+        applyLockUI(); toast('Đã mở khóa ✓', 'ok');
+      } else toast('Sai passcode.', 'err');
+    }).catch(onError);
+  }
+
+  // ── Sửa cấu hình ───────────────────────────────────────────
+  function openCfgForm() {
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var c = STATE.config;
+    $('cfgBuyIn').value = c.buyInDefault; $('cfgSB').value = c.smallBlind;
+    $('cfgBB').value = c.bigBlind; $('cfgRatio').value = c.chipRatio;
+    $('cfgMaxBuyIn').value = c.maxBuyInPerPlayer || 0;
+    $('cfgPass').value = ''; $('cfgClearPass').checked = false;
+    $('cfgGameType').value = c.gameType || 'cash';
+    $('cfgPayout').value = c.payoutStructure || '50,30,20';
+    $('cfgDenoms').value = c.chipDenominations || '';
+    $('cfgBlind').value = c.blindStructure || '';
+    togglePayoutField();
+    updateCfgHints();
+    $('cfgForm').hidden = false;   // P13: hệ số nhân đổi mọi lúc (không còn khóa)
+  }
+  function togglePayoutField() {
+    var t = $('cfgGameType').value === 'tournament';
+    $('cfgPayoutWrap').hidden = !t; $('cfgBlindWrap').hidden = !t;
+  }
+
+  // Điểm×hệ số = ₫ hint cho buy-in/SB/BB (đọc hệ số từ ô cfgRatio đang gõ)
+  function updateCfgHints() {
+    var mult = parseInt(($('cfgRatio').value || '').replace(/[^\d]/g, ''), 10) || 0;
+    var pts = function (id) { return parseInt(($(id).value || '').replace(/[^\d]/g, ''), 10) || 0; };
+    $('cfgBuyInVND').textContent = '= ' + fmtVND(pts('cfgBuyIn') * mult);
+    $('cfgSBVnd').textContent = '= ' + fmtVND(pts('cfgSB') * mult);
+    $('cfgBBVnd').textContent = '= ' + fmtVND(pts('cfgBB') * mult);
+  }
+  function onCfgSubmit(e) {
+    e.preventDefault();
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var num = function (id) { var v = $(id).value.replace(/[^\d]/g, ''); return v === '' ? undefined : parseInt(v, 10); };
+    var patch = { buyInDefault: num('cfgBuyIn'), smallBlind: num('cfgSB'), bigBlind: num('cfgBB') };
+    var mb = num('cfgMaxBuyIn'); patch.maxBuyInPerPlayer = (mb === undefined ? 0 : mb);   // P24: rỗng = bỏ trần (0)
+    var r = num('cfgRatio'); if (r !== undefined) patch.chipRatio = r;   // P13: đổi mọi lúc
+    patch.chipDenominations = $('cfgDenoms').value.trim();
+    patch.gameType = $('cfgGameType').value;
+    if ($('cfgPayout').value.trim()) patch.payoutStructure = $('cfgPayout').value.trim();
+    if ($('cfgGameType').value === 'tournament' && $('cfgBlind').value.trim()) patch.blindStructure = $('cfgBlind').value.trim();
+    var newPass = null;
+    if ($('cfgClearPass').checked) { patch.passcode = ''; newPass = ''; }
+    else { var pv = $('cfgPass').value; if (pv !== '') { patch.passcode = pv; newPass = pv; } }
+    $('cfgForm').hidden = true;
+    mutating++;
+    srun('updateConfig', patch, passcode).then(function (state) {
+      render(state); toast('Đã lưu cấu hình', 'ok');
+      if (newPass !== null) {                  // passcode vừa đổi -> giữ quyền sửa
+        passcode = newPass; unlocked = true; passTried = true;
+        try { newPass ? localStorage.setItem('pokerPasscode', newPass) : localStorage.removeItem('pokerPasscode'); } catch (e) {}
+        applyLockUI();
+      }
+    }).catch(onError).then(function () { mutating--; });
+  }
+
+  function renderConfig(s) {
+    var c = s.config;
+    var balanced = s.imbalanceVND === 0;
+    var isTour = c.gameType === 'tournament';
+    var mult = Number(c.chipRatio) || 1;
+    var pill = function (lbl, val) { return '<span class="cfg-pill"><span class="lbl">' + lbl + '</span> <b>' + val + '</b></span>'; };
+    $('configSummary').innerHTML =
+      '<div class="config-line">' +
+        pill('Buy-in', c.buyInDefault + ' điểm · ' + fmtVND(c.buyInDefault * mult)) +
+        pill('SB', fmtVND(c.smallBlind * mult)) +
+        pill('BB', fmtVND(c.bigBlind * mult)) +
+        (isTour ? pill('Thưởng', esc(c.payoutStructure || '50,30,20')) : pill('1 điểm', fmtVND(c.chipRatio))) +
+        pill('Mệnh giá', esc(c.chipDenominations || '—')) +
+        '<span class="cfg-pill"><b>' + esc(c.currency || 'VND') + '</b></span>' +
+        '<span class="cfg-pill"><b>' + (isTour ? '🏆 Tour' : '💵 Cash') + '</b></span>' +
+      '</div>' +
+      '<div class="config-sep"></div>' +
+      '<div class="stat-row">' +
+        stat(isTour ? 'Pool giải' : 'Tổng pot', fmtVND(s.potVND)) +
+        stat('Điểm trên bàn', (s.chipsInPlay || 0).toLocaleString('vi-VN')) +
+        stat('Người chơi', s.players.length) +
+        '<div class="stat"><span class="k">Σ Lời-Lỗ</span><span class="v ' + (balanced ? 'balance-ok' : 'balance-bad') + '">' +
+          (balanced ? '0 ✓' : fmtSigned(s.imbalanceVND) + ' ⚠') + '</span></div>' +
+      '</div>' +
+      (s.warnings && s.warnings.length ? '<div class="config-sep"></div><div style="color:var(--loss);font-size:13px;font-weight:600">⚠ ' + esc(s.warnings[0]) + '</div>' : '');
+  }
+  function stat(k, v) { return '<div class="stat"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>'; }
+
+  function renderPlayers(s) {
+    var list = $('playerList');
+    var netById = {};
+    s.leaderboard.forEach(function (r) { netById[r.playerId] = r; });
+    var top = s.leaderboard.length ? s.leaderboard[0] : null;
+
+    if (!s.players.length) { list.innerHTML = ''; $('emptyState').hidden = false; return; }
+    $('emptyState').hidden = true;
+    var cfg = s.config, isTour = cfg.gameType === 'tournament';
+    var mult = Number(cfg.chipRatio) || 1;
+    var denoms = cParseDenoms(cfg.chipDenominations);
+    var bdPts = Number(cfg.buyInDefault) || 0;
+
+    list.innerHTML = s.players.map(function (p) {
+      var lb = netById[p.playerId] || { net: 0, rank: 0 };
+      var netCls = lb.net > 0 ? 'win' : lb.net < 0 ? 'loss' : 'zero';
+      var isLeader = top && top.playerId === p.playerId && lb.net > 0;
+      var buyIns = Math.max(1, Math.round(p.totalBuyIn / (bdPts || p.totalBuyIn || 1)));
+      var pts = dirtyChips[p.playerId] != null ? dirtyChips[p.playerId] : p.currentChips;
+      var cashed = (!isTour && p.currentChips === 0 && (p.totalCashOut || 0) > 0);
+      var open = !!chipOpen[p.playerId];
+      return '' +
+        '<div class="player' + (open ? ' open' : '') + '" data-id="' + p.playerId + '">' +
+          (isLeader ? '<span class="crown">👑</span>' : '') +
+          '<div class="avatar" style="--c:' + esc(p.avatarColor || '#888') + '">' + esc(initial(p.name)) + '</div>' +
+          '<div class="p-main">' +
+            '<div class="p-name">' + esc(p.name) + ' <span class="p-buyins">×' + buyIns + ' · ' + fmtK(p.totalBuyIn * mult) + '</span>' +
+              (cashed ? ' <span class="p-cashed">ĐÃ RÚT</span>' : '') +
+              (lb.eliminated ? ' <span class="p-out">💀 OUT · hạng ' + lb.rank + '</span>' : '') + '</div>' +
+            '<div class="chip-line">' +
+              '<b class="chip-pts">' + pts + '</b> <span class="chip-unit">điểm</span> · <span class="chip-vnd">' + fmtVND(pts * mult) + '</span>' +
+              '<button class="chip-toggle" data-act="chiptoggle" title="Sửa chip theo mệnh giá">' + (open ? '▴' : '▾ chip') + '</button>' +
+            '</div>' +
+            (open ? denomEditorHTML(p, denoms) : '') +
+          '</div>' +
+          '<div class="p-net ' + netCls + '">' + fmtSigned(lb.net) + '</div>' +
+          '<div class="p-actions">' +
+            '<button class="act rebuy" data-act="rebuy" title="' + (isTour ? 'Re-entry (mua thêm suất)' : 'Rebuy (nạp thêm)') + '">💰</button>' +
+            (!isTour && p.currentChips > 0 ? '<button class="act cashout" data-act="cashout" title="Cash-out (rút chip thành tiền)">💵</button>' : '') +
+            (isTour ? '<button class="act elim' + (lb.eliminated ? ' on' : '') + '" data-act="eliminate" title="' + (lb.eliminated ? 'Hủy loại (cho chơi lại)' : 'Loại — đánh dấu cháy') + '">💀</button>' : '') +
+            '<button class="act del" data-act="del" title="Xóa khỏi bàn">🗑</button>' +
+          '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  /** Editor chip theo mệnh giá (mở rộng) cho 1 người. */
+  function denomEditorHTML(p, denoms) {
+    var counts = cParseCounts(p.chipCounts);
+    var known = cCountsPts(counts) === p.currentChips && p.currentChips > 0;
+    var cells = denoms.map(function (d) {
+      return '<div class="denom-cell" data-denom="' + d + '">' +
+        '<span class="denom-face">' + d + '</span>' +
+        '<button class="denom-btn" data-act="denomMinus">−</button>' +
+        '<input class="denom-count" inputmode="numeric" data-act="denomcount" value="' + (counts[d] || 0) + '">' +
+        '<button class="denom-btn" data-act="denomPlus">+</button>' +
+      '</div>';
+    }).join('');
+    return '<div class="denom-editor">' +
+      (denoms.length
+        ? '<div class="denom-cells">' + cells + '</div>' +
+          '<div class="denom-foot"><span class="denom-sum">= ' + cCountsPts(counts) + ' điểm</span>' +
+          (!known && p.currentChips > 0 ? '<button class="denom-suggest" data-act="suggest">✨ Chia ' + p.currentChips + ' điểm</button>' : '') +
+          '</div>'
+        : '<span class="cfg-note">Chưa đặt mệnh giá chip trong Config.</span>') +
+      '<label class="denom-quick">hoặc nhập tổng: <input class="chip-input" inputmode="numeric" data-act="chip" value="' + p.currentChips + '"> điểm</label>' +
+    '</div>';
+  }
+
+  /** Đọc các ô mệnh giá của 1 dòng player -> map {denom:count}. */
+  function readDenomCells(row) {
+    var m = {};
+    Array.prototype.forEach.call(row.querySelectorAll('.denom-cell'), function (cell) {
+      var c = parseInt(cell.querySelector('.denom-count').value, 10) || 0;
+      if (c > 0) m[cell.getAttribute('data-denom')] = c;
+    });
+    return m;
+  }
+  /** Debounce lưu chip theo mệnh giá (setChipCounts). Cập nhật tổng/₫ tại chỗ. */
+  function scheduleChipCounts(playerId, row) {
+    var counts = readDenomCells(row);
+    var pts = cCountsPts(counts), str = cSerCounts(counts);
+    dirtyChips[playerId] = pts;
+    var sumEl = row.querySelector('.denom-sum'); if (sumEl) sumEl.textContent = '= ' + pts + ' điểm';
+    var ptsEl = row.querySelector('.chip-pts'); if (ptsEl) ptsEl.textContent = pts;
+    var vndEl = row.querySelector('.chip-vnd'); if (vndEl) vndEl.textContent = fmtVND(pts * chipMult());
+    row.classList.add('saving');
+    clearTimeout(chipTimers[playerId]);
+    chipTimers[playerId] = setTimeout(function () {
+      mutating++;
+      srun('setChipCounts', playerId, str, passcode)
+        .then(function (state) { delete dirtyChips[playerId]; render(state); })
+        .catch(function (e) { delete dirtyChips[playerId]; onError(e); if (STATE) render(STATE); })
+        .then(function () { mutating--; });
+    }, 550);
+  }
+
+  function renderLeaderboard(s) {
+    var panel = $('lbPanel');
+    if (!s.players.length) { panel.hidden = true; return; }
+    panel.hidden = false;
+    var isTour = s.config.gameType === 'tournament';
+    var maxAbs = Math.max.apply(null, [1].concat(s.leaderboard.map(function (r) { return Math.abs(r.net); })));
+    $('lbList').innerHTML = s.leaderboard.map(function (r) {
+      var cls = r.net > 0 ? 'win' : r.net < 0 ? 'loss' : 'zero';
+      var medal = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : '#' + r.rank;
+      var arrow = r.net > 0 ? '▲' : r.net < 0 ? '▼' : '–';
+      var pct = 50 * Math.abs(r.net) / maxAbs;
+      var fill = r.net > 0 ? '<div class="lb-fill win" style="left:50%;width:' + pct + '%"></div>'
+               : r.net < 0 ? '<div class="lb-fill loss" style="right:50%;width:' + pct + '%"></div>' : '';
+      var payout = (isTour && r.payoutVND) ? '<i class="lb-payout">🏆 ' + fmtVND(r.payoutVND) + '</i>' : '';
+      return '<div class="lb-row">' +
+        '<span class="lb-rank">' + medal + '</span>' +
+        '<span class="lb-name">' + esc(r.name) + payout + '</span>' +
+        '<span class="lb-net ' + cls + '">' + arrow + ' ' + fmtSigned(r.net) + '</span>' +
+        '<div class="lb-bar"><div class="lb-center"></div>' + fill + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function renderSettlement(s) {
+    var panel = $('settlePanel'), body = $('settleBody'), meta = $('settleMeta');
+    if (!s.players.length) { panel.hidden = true; return; }
+    panel.hidden = false;
+
+    if (s.imbalanceVND !== 0) {                          // lệch -> chặn chia
+      meta.textContent = '';
+      body.innerHTML = '<div class="settle-warn">⚠ ' + esc(s.warnings[0] || 'Số chip đang lệch.') +
+        '<span>Cân lại số chip cho Σ Lời-Lỗ = 0 rồi mới chia được tiền.</span></div>';
+      settleCelebrated = false;
+      return;
+    }
+    if (!s.settlement.length) {                          // huề cả làng
+      meta.textContent = '';
+      body.innerHTML = '<div class="settle-allsquare">✓ Tất cả huề — không ai phải trả ai 🎉</div>';
+      settleCelebrated = false;
+      return;
+    }
+    var total = s.settlement.reduce(function (a, t) { return a + t.amountVND; }, 0);
+    var saved = !!s.settlementSaved;
+    var paidCount = (s.settlementPaid || []).filter(Boolean).length;
+    meta.textContent = 'tổng ' + fmtVND(total) + ' · ' + s.settlement.length + ' giao dịch' +
+      (saved ? ' · đã trả ' + paidCount + '/' + s.settlement.length : '');
+    var netByName = {}; s.leaderboard.forEach(function (r) { netByName[r.name] = r.net; });
+    var editable = canEdit();
+
+    var rows = s.settlement.map(function (t, i) {
+      var paid = !!(s.settlementPaid && s.settlementPaid[i]);
+      var toggle = saved
+        ? '<button class="s-paid' + (paid ? ' done' : '') + '" data-act="paid"' + (editable ? '' : ' disabled') + '>' +
+            (paid ? '✓ Đã trả' : '○ Chưa') + '</button>'
+        : '';
+      return '<div class="settle-row" data-from="' + esc(t.from) + '" data-to="' + esc(t.to) + '">' +
+        '<span class="s-from">' + esc(t.from) + '<i>' + fmtSigned(netByName[t.from] || 0) + '</i></span>' +
+        '<span class="s-arrow">→</span>' +
+        '<span class="s-amt">' + fmtVND(t.amountVND) + '</span>' +
+        '<span class="s-to">' + esc(t.to) + '<i>' + fmtSigned(netByName[t.to] || 0) + '</i></span>' +
+        toggle +
+      '</div>';
+    }).join('');
+
+    var actions = '<div class="settle-actions">' +
+      (editable && (!saved || s.settlementStale)
+        ? '<button class="btn btn-accent" data-act="settle">' + (s.settlementStale ? '⟳ Chốt lại' : '🔒 Chốt danh sách trả') + '</button>'
+        : '') +
+      '<button class="btn btn-ghost" data-act="copysum">📋 Copy tóm tắt</button>' +
+      '<button class="btn btn-ghost" data-act="copycsv">📄 Copy CSV</button>' +
+      '</div>' +
+      (s.settlementStale ? '<div class="settle-hint warn">⚠ Số chip đã đổi từ lần chốt — chốt lại để tick “đã trả”.</div>'
+        : saved ? '' : '<div class="settle-hint">Bấm “Chốt danh sách trả” để tick từng khoản đã trả (lưu bền).</div>');
+
+    body.innerHTML = '<div class="settle-list">' + rows + '</div>' + actions;
+
+    if (saved && paidCount === s.settlement.length) {    // tick hết -> ăn mừng (1 lần)
+      if (!settleCelebrated) { settleCelebrated = true; celebrate(); }
+    } else settleCelebrated = false;
+  }
+
+  // Sự kiện panel settlement: tick đã trả / chốt / copy
+  function onSettleClick(e) {
+    var btn = e.target.closest('[data-act]'); if (!btn) return;
+    var act = btn.dataset.act;
+    if (act === 'copysum') { copyText(buildSummaryText(STATE), 'Đã copy tóm tắt ✓'); return; }
+    if (act === 'copycsv') { copyText(buildCSV(STATE), 'Đã copy CSV ✓'); return; }
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    if (act === 'settle') { mutate(srun('settle', passcode), 'Đã chốt danh sách ✓'); return; }
+    if (act === 'paid') {
+      var row = e.target.closest('.settle-row'); if (!row) return;
+      var wasPaid = btn.classList.contains('done');
+      mutate(srun('markPaid', row.dataset.from, row.dataset.to, !wasPaid, passcode), null);
+    }
+  }
+
+  // ── Copy tóm tắt / CSV (dán chat) ──────────────────────────
+  function buildSummaryText(s) {
+    var isTour = s.config.gameType === 'tournament';
+    var L = ['🃏 POKER LEDGER — ' + (isTour ? 'Tournament' : 'Cash game') + ' — ' + new Date().toLocaleDateString('vi-VN'), '', 'XẾP HẠNG:'];
+    s.leaderboard.forEach(function (r) {
+      var medal = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : '#' + r.rank;
+      L.push(medal + ' ' + r.name + ': ' + fmtSigned(r.net) + (isTour && r.payoutVND ? ' (thưởng ' + fmtVND(r.payoutVND) + ')' : ''));
+    });
+    if (s.settlement && s.settlement.length) {
+      L.push('', 'CHIA TIỀN:');
+      s.settlement.forEach(function (t, i) {
+        var paid = s.settlementSaved && s.settlementPaid && s.settlementPaid[i];
+        L.push('• ' + t.from + ' → ' + t.to + ': ' + fmtVND(t.amountVND) + (paid ? ' ✓' : ''));
+      });
+    }
+    L.push('', (isTour ? 'Pool giải: ' : 'Tổng pot: ') + fmtVND(s.potVND));
+    return L.join('\n');
+  }
+  function csvCell(c) { c = String(c == null ? '' : c); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }
+  function buildCSV(s) {
+    var isTour = s.config.gameType === 'tournament';
+    var rows = [isTour ? ['Hang', 'Ten', 'BuyIn', 'Diem', 'Thuong', 'Net'] : ['Hang', 'Ten', 'BuyIn', 'Diem', 'Net']];
+    s.leaderboard.forEach(function (r) {
+      var row = [r.rank, r.name, r.totalBuyIn, r.currentChips];
+      if (isTour) row.push(r.payoutVND || 0);
+      row.push(r.net);
+      rows.push(row);
+    });
+    return rows.map(function (r) { return r.map(csvCell).join(','); }).join('\n');
+  }
+  function copyText(text, okMsg) {
+    function done() { toast(okMsg || 'Đã copy ✓', 'ok'); }
+    function fallback() {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        document.execCommand('copy'); ta.remove(); done();
+      } catch (e) { toast('Không copy được — bôi đen thủ công.', 'err'); }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(fallback);
+    } else fallback();
+  }
+  function celebrate() {
+    toast('🎉 Đã trả hết — settled!', 'ok');
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var colors = ['#3DDC84', '#4CC2FF', '#FFC247', '#FF7CAB', '#B47CFF', '#F5D272'];
+    var wrap = document.createElement('div'); wrap.className = 'confetti';
+    for (var i = 0; i < 28; i++) {
+      var p = document.createElement('i');
+      p.style.left = (Math.random() * 100) + '%';
+      p.style.background = colors[i % colors.length];
+      p.style.animationDelay = (Math.random() * 0.3) + 's';
+      wrap.appendChild(p);
+    }
+    document.body.appendChild(wrap);
+    setTimeout(function () { wrap.remove(); }, 2600);
+  }
+
+  // ── Đồng hồ blind (Phase 14) ───────────────────────────────
+  var CLOCK = null, serverOffset = 0, clockAdvancing = false, lastLevelSeen = null;
+  function adjustedNow() { return Date.now() + serverOffset; }   // ≈ giờ server (bù lệch đồng hồ máy)
+  function fmtClock(ms) {
+    var s = Math.round(Math.max(0, ms) / 1000), m = Math.floor(s / 60);
+    return (m < 10 ? '0' : '') + m + ':' + ((s % 60) < 10 ? '0' : '') + (s % 60);
+  }
+  function playLevelNumber(c) {   // số "Level" bỏ qua các mục nghỉ (1,2,3… như bảng)
+    var n = 0; for (var i = 0; i <= c.level && i < c.levels.length; i++) if (!c.levels[i].isBreak) n++;
+    return n || 1;
+  }
+  function renderClock(s) {
+    var isTour = s.config.gameType === 'tournament', c = s.clock, panel = $('clockPanel');
+    if (!isTour || !c || !c.count) { panel.hidden = true; CLOCK = null; lastLevelSeen = null; return; }
+    panel.hidden = false; CLOCK = c;
+    if (lastLevelSeen !== null && c.level !== lastLevelSeen) beep();   // báo khi đổi level
+    lastLevelSeen = c.level;
+    var cur = c.current || { sb: 0, bb: 0, isBreak: false };
+    $('clockLvl').textContent = cur.isBreak ? '☕ GIẢI LAO' : ('Level ' + playLevelNumber(c));
+    var bl = $('clockBlinds');
+    if (cur.isBreak) { bl.className = 'clock-blinds brk'; bl.textContent = 'NGHỈ'; }
+    else { bl.className = 'clock-blinds'; bl.innerHTML = '<span class="k">SB</span> ' + cur.sb + ' · <span class="k">BB</span> ' + cur.bb; }
+    var nx = c.next;
+    $('clockNext').textContent = nx ? ('Kế: ' + (nx.isBreak ? '☕ nghỉ ' + nx.minutes + "'" : nx.sb + '/' + nx.bb)) : '— level cuối —';
+    $('clockCtrls').querySelector('.clk-play').textContent = c.running ? '⏸' : '▶';
+    tickClock();
+  }
+  function tickClock() {
+    if (!CLOCK) return;
+    var el = $('clockTime');
+    var rem = CLOCK.running ? (Date.parse(CLOCK.endsAt) - adjustedNow()) : (CLOCK.remainingMs || 0);
+    el.textContent = fmtClock(rem);
+    el.className = 'clock-time' + (CLOCK.running && rem <= 60000 ? ' warn' : '');
+    if (CLOCK.running && rem <= 0 && canEdit() && !clockAdvancing) {   // hết giờ -> máy chủ tự nhảy level
+      clockAdvancing = true;
+      srun('clockAction', 'next', null, passcode).then(function (st) { clockAdvancing = false; render(st); })
+        .catch(function () { clockAdvancing = false; });
+    }
+  }
+  function onClockClick(e) {
+    var btn = e.target.closest('[data-clk]'); if (!btn) return;
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var a = btn.dataset.clk;
+    if (a === 'toggle') a = (CLOCK && CLOCK.running) ? 'pause' : 'start';
+    if (a === 'reset' && !confirm('Reset đồng hồ về Level 1?')) return;
+    mutate(srun('clockAction', a, null, passcode));
+  }
+  function beep() {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return;
+      var ctx = new Ctx(), o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination); o.type = 'sine'; o.frequency.value = 880;
+      g.gain.setValueAtTime(0.25, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      o.start(); o.stop(ctx.currentTime + 0.6);
+    } catch (e) {}
+  }
+
+  // ── Sửa chip (debounce) ────────────────────────────────────
+  function scheduleChip(playerId, value, rowEl) {
+    dirtyChips[playerId] = value;
+    if (rowEl) rowEl.classList.add('saving');
+    clearTimeout(chipTimers[playerId]);
+    chipTimers[playerId] = setTimeout(function () {
+      mutating++;
+      srun('updateChips', playerId, value, passcode)
+        .then(function (state) { delete dirtyChips[playerId]; render(state); })
+        .catch(function (e) { delete dirtyChips[playerId]; onError(e); if (STATE) render(STATE); })
+        .then(function () { mutating--; });
+    }, 550);
+  }
+
+  // ── Sự kiện (event delegation trên danh sách) ──────────────
+  function onListClick(e) {
+    var btn = e.target.closest('[data-act]'); if (!btn) return;
+    var row = e.target.closest('.player'); if (!row) return;
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var id = row.dataset.id;
+    var act = btn.dataset.act;
+    var p = STATE.players.filter(function (x) { return x.playerId === id; })[0];
+    var name = p ? p.name : '';
+
+    if (act === 'chiptoggle') { chipOpen[id] = !chipOpen[id]; renderPlayers(STATE); return; }
+    if (act === 'del') {
+      if (confirm('Xóa "' + name + '" khỏi bàn? (giữ trong lịch sử)')) mutate(srun('removePlayer', id, passcode), 'Đã xóa khỏi bàn');
+      return;
+    }
+    if (act === 'rebuy') {
+      var amt = prompt('Nạp thêm (rebuy) bao nhiêu ĐIỂM chip cho ' + name + '?', STATE.config.buyInDefault);
+      if (amt == null) return;
+      amt = parseInt(String(amt).replace(/[^\d]/g, ''), 10);
+      if (!amt || amt <= 0) { toast('Số điểm không hợp lệ.', 'err'); return; }
+      mutate(srun('rebuy', id, amt, passcode), 'Đã rebuy ' + name);
+      return;
+    }
+    if (act === 'eliminate') {
+      var lbp = STATE.leaderboard.filter(function (r) { return r.playerId === id; })[0];
+      var on = !(lbp && lbp.eliminated);
+      if (on && !confirm('Đánh dấu ' + name + ' bị loại?\nChip về 0 và gán hạng chốt (loại trước = hạng thấp hơn).')) return;
+      mutate(srun('setEliminated', id, on, passcode), on ? name + ' đã bị loại 💀' : 'Cho ' + name + ' chơi lại');
+      return;
+    }
+    if (act === 'cashout') {
+      if (confirm('Cash-out ' + name + '? Đổi hết chip hiện tại thành tiền rút.')) mutate(srun('cashOut', id, passcode), 'Đã cash-out ' + name);
+      return;
+    }
+    if (act === 'denomMinus' || act === 'denomPlus') {
+      var cell = e.target.closest('.denom-cell'); var inp = cell.querySelector('.denom-count');
+      inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) + (act === 'denomPlus' ? 1 : -1));
+      scheduleChipCounts(id, row);
+      return;
+    }
+    if (act === 'suggest') {
+      var dist = cDistribute(p.currentChips, cParseDenoms(STATE.config.chipDenominations), {});
+      Array.prototype.forEach.call(row.querySelectorAll('.denom-cell'), function (cell2) {
+        cell2.querySelector('.denom-count').value = dist.counts[cell2.getAttribute('data-denom')] || 0;
+      });
+      scheduleChipCounts(id, row);
+    }
+  }
+  function onListInput(e) {
+    if (!canEdit()) return;
+    var row = e.target.closest('.player'); if (!row) return;
+    var id = row.dataset.id;
+    if (e.target.classList.contains('chip-input')) {
+      scheduleChip(id, Math.max(0, parseInt(e.target.value, 10) || 0), row);
+    } else if (e.target.classList.contains('denom-count')) {
+      scheduleChipCounts(id, row);
+    }
+  }
+
+  // ── Add form ───────────────────────────────────────────────
+  function toggleAdd(show) {
+    $('addForm').hidden = !show;
+    setBulkMode(false);
+    if (show) { $('addName').value = ''; $('addBuyIn').value = ''; updateAddHint(); $('addName').focus(); }
+  }
+  // ── Thêm hàng loạt (Phase 15) ──────────────────────────────
+  function setBulkMode(on) {
+    $('addSingle').hidden = on;
+    $('addBulk').hidden = !on;
+    $('bulkToggle').textContent = on ? '↩ Quay lại thêm 1 người' : '📋 Nhập danh sách nhiều người';
+    if (on) { $('addBulkNames').value = ''; $('addBulkBuyIn').value = ''; updateBulkCount(); $('addBulkNames').focus(); }
+  }
+  /** Đếm số tên hợp lệ trong textarea (ngăn bởi dòng / dấu phẩy / chấm phẩy). */
+  function parseBulkNames() {
+    return ($('addBulkNames').value || '').split(/[\n,;]+/)
+      .map(function (x) { return x.trim(); }).filter(function (x) { return x.length; });
+  }
+  function updateBulkCount() {
+    var n = parseBulkNames().length;
+    $('addBulkCount').textContent = n + ' tên';
+  }
+  function onBulkGo() {
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var names = parseBulkNames();
+    if (!names.length) { toast('Chưa nhập tên nào.', 'err'); return; }
+    if (names.length > 50) { toast('Tối đa 50 người một lần.', 'err'); return; }
+    var buyIn = $('addBulkBuyIn').value.trim();
+    buyIn = buyIn === '' ? '' : (parseInt(buyIn.replace(/[^\d]/g, ''), 10) || 0);
+    toggleAdd(false);
+    mutating++;
+    srun('addPlayers', names, buyIn, passcode).then(function (res) {
+      render(res.state);
+      var a = (res.added || []).length, sk = (res.skipped || []).length;
+      var msg = a > 0 ? ('Đã thêm ' + a + ' người') : 'Không thêm được ai';
+      if (sk > 0) msg += ' · bỏ ' + sk + ' trùng tên';
+      toast(msg, a > 0 ? 'ok' : 'err');
+    }).catch(onError).then(function () { mutating--; });
+  }
+  /** Preview: buy-in điểm -> tiền + gợi ý chia chip theo mệnh giá. */
+  function updateAddHint() {
+    var c = STATE ? STATE.config : {};
+    var raw = ($('addBuyIn').value || '').replace(/[^\d]/g, '');
+    var pts = raw === '' ? (Number(c.buyInDefault) || 0) : (parseInt(raw, 10) || 0);
+    var mult = Number(c.chipRatio) || 1;
+    var dist = cDistribute(pts, cParseDenoms(c.chipDenominations), {});
+    var bd = cBreakdownText(dist.counts);
+    $('addHint').textContent = pts > 0
+      ? '= ' + fmtVND(pts * mult) + (bd ? ' · phát: ' + bd : '') + (dist.remainder ? ' (+' + dist.remainder + ' lẻ)' : '')
+      : '';
+  }
+  function onAddSubmit(e) {
+    e.preventDefault();
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var name = $('addName').value.trim();
+    if (!name) { toast('Nhập tên người chơi.', 'err'); return; }
+    var buyIn = $('addBuyIn').value.trim();
+    buyIn = buyIn === '' ? '' : (parseInt(buyIn.replace(/[^\d]/g, ''), 10) || 0);   // ĐIỂM chip
+    toggleAdd(false);
+    mutate(srun('addPlayer', name, buyIn, passcode), 'Đã thêm ' + name);
+  }
+
+  // ── Theme: felt -> vault -> neon, nhớ localStorage ─────────
+  var THEME_NAMES = { felt: 'Casino Felt', vault: 'Luxe Vault', neon: 'Dark Neon' };
+  function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); try { localStorage.setItem('pokerTheme', t); } catch (e) {} }
+  function cycleTheme() {
+    var cur = document.documentElement.getAttribute('data-theme');
+    var next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
+    applyTheme(next);
+    toast('🎨 ' + (THEME_NAMES[next] || next), 'info');
+  }
+
+  // ── Lịch sử + tích lũy + đóng phiên (Phase 9) ──────────────
+  function openHistory() {
+    $('histModal').hidden = false;
+    renderResetBar();
+    $('histAwards').innerHTML = '<div class="hist-loading">Đang tải…</div>';
+    $('histCumulative').innerHTML = '<div class="hist-loading">Đang tải…</div>';
+    $('histStats').innerHTML = '<div class="hist-loading">Đang tải…</div>';
+    $('histSessions').innerHTML = '';
+    refreshHistory();
+  }
+  function closeHistory() { $('histModal').hidden = true; }
+  function refreshHistory() {
+    var a = srun('getHistory').then(renderHistory).catch(function (e) {
+      $('histCumulative').innerHTML = '<div class="hist-empty">Không tải được lịch sử.</div>';
+      onError(e);
+    });
+    var b = srun('getStats').then(function (st) { STATS = st; renderAwards(); renderStats(); }).catch(function (e) {
+      $('histStats').innerHTML = '<div class="hist-empty">Không tải được thống kê.</div>';
+      $('histAwards').innerHTML = '<div class="hist-empty">Không tải được vinh danh.</div>';
+    });
+    return Promise.all([a, b]);
+  }
+
+  // ── Bảng vinh danh tổng (Phase 17) ────────────────────────
+  var AWARD_META = {
+    richest:    { icon: '🤑', title: 'Ăn đậm nhất' },
+    poorest:    { icon: '💸', title: 'Thua đậm nhất' },
+    champ:      { icon: '🏆', title: 'Vô địch nhiều nhất' },
+    winrate:    { icon: '🎯', title: 'Tỉ lệ vô địch cao nhất' },
+    bigwin:     { icon: '🚀', title: 'Ván lời to nhất' },
+    bigloss:    { icon: '🩸', title: 'Ván lỗ nặng nhất' },
+    grinder:    { icon: '🎰', title: 'Chăm chỉ nhất' },
+    highroller: { icon: '💰', title: 'Chi mạnh tay nhất' },
+  };
+  function awardDetail(a) {
+    switch (a.key) {
+      case 'richest': case 'poorest': return fmtSigned(a.net) + ' · ' + a.sessions + ' phiên';
+      case 'champ':   return a.wins + ' 🏆 / ' + a.sessions + ' phiên';
+      case 'winrate': return Math.round(a.rate * 100) + '% (' + a.wins + '/' + a.sessions + ' phiên)';
+      case 'bigwin': case 'bigloss': return fmtSigned(a.net) + ' · ' + fmtDay(a.dateIso);
+      case 'grinder': return a.sessions + ' phiên';
+      case 'highroller': return 'nạp tổng ' + fmtVND(a.buyIn);
+      default: return '';
+    }
+  }
+  /** ISO -> 'DD/MM/YYYY' (ngày, bỏ giờ). */
+  function fmtDay(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+  function renderAwards() {
+    var box = $('histAwards');
+    var aw = (STATS && STATS.awards && STATS.awards.awards) || [];
+    if (!aw.length) {
+      box.innerHTML = '<div class="hist-empty">Chưa có phiên nào để vinh danh.<br>Đóng vài phiên để bình chọn 🏅</div>';
+      return;
+    }
+    box.innerHTML = aw.map(function (a) {
+      var m = AWARD_META[a.key] || { icon: '🎖', title: a.key };
+      var tone = (a.key === 'poorest' || a.key === 'bigloss') ? ' loss' : (a.key === 'richest' || a.key === 'bigwin') ? ' win' : '';
+      return '<div class="award' + tone + '">' +
+        '<div class="award-icon">' + m.icon + '</div>' +
+        '<div class="award-body">' +
+          '<div class="award-title">' + m.title + '</div>' +
+          '<div class="award-name">' + esc(a.name) + '</div>' +
+          '<div class="award-detail">' + awardDetail(a) + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // ── Thống kê theo kỳ: Ngày / Tuần / Tháng (Phase 16 + drill-down 16.1) ──
+  var STATS = null, statGran = 'week', statDay = '';
+  var HIST = null;                 // P22: giữ getHistory() gần nhất -> form nhập bù điền sẵn tên
+  function onGranClick(e) {
+    var btn = e.target.closest('[data-gran]'); if (!btn) return;
+    statGran = btn.dataset.gran;
+    Array.prototype.forEach.call($('statGran').children, function (b) {
+      b.classList.toggle('is-on', b.dataset.gran === statGran);
+    });
+    renderStats();
+  }
+  /** Từ 'month'/'week' -> cấp con kế; 'day' -> null. */
+  function childGranOf(g) { return g === 'month' ? 'week' : g === 'week' ? 'day' : null; }
+  function kidWord(g) { return g === 'month' ? 'tuần' : g === 'week' ? 'ngày' : ''; }
+
+  /** 1 thẻ kỳ (đệ quy). gran = cấp của thẻ này; nếu có con -> bung được. */
+  function statCardHTML(p, gran, depth) {
+    var kids = p.children || [];
+    var hasKids = kids.length > 0;
+    var badges = (p.cash ? '<span class="stat-badge cash">💵 ' + p.cash + '</span>' : '') +
+                 (p.tour ? '<span class="stat-badge tour">🏆 ' + p.tour + '</span>' : '');
+    var rows = p.players.map(function (r) {
+      var cls = r.netVND > 0 ? 'win' : r.netVND < 0 ? 'loss' : 'zero';
+      return '<div class="stat-prow">' +
+        '<span class="stat-pname">' + esc(r.name) + '<i>' + r.sessions + ' phiên' + (r.wins ? ' · ' + r.wins + ' 🏆' : '') + '</i></span>' +
+        '<span class="stat-pnet ' + cls + '">' + fmtSigned(r.netVND) + '</span>' +
+      '</div>';
+    }).join('');
+    var caret = hasKids ? '<span class="stat-caret">▸</span>' : '';
+    var kidsHTML = hasKids
+      ? '<div class="stat-children" hidden>' +
+          '<div class="stat-kidhead">Chi tiết theo ' + kidWord(gran) + '</div>' +
+          kids.map(function (c) { return statCardHTML(c, childGranOf(gran), depth + 1); }).join('') +
+        '</div>'
+      : '';
+    return '<div class="stat-period d' + depth + (hasKids ? ' has-kids' : '') + '">' +
+      '<div class="stat-phead"' + (hasKids ? ' data-act="toggle"' : '') + '>' +
+        caret + '<b>' + esc(p.label) + '</b>' +
+        '<span class="stat-meta">' + badges +
+          '<span class="stat-pot">pot ' + fmtVND(p.totalPotVND) + '</span></span>' +
+      '</div>' +
+      '<div class="stat-plist">' + rows + '</div>' +
+      kidsHTML +
+    '</div>';
+  }
+
+  function renderStats() {
+    var box = $('histStats');
+    var dayWrap = $('statDayWrap');
+    dayWrap.hidden = statGran !== 'day';
+    if (!STATS) { box.innerHTML = '<div class="hist-loading">Đang tải…</div>'; return; }
+
+    if (statGran === 'day') fillDaySelect();
+    var periods = STATS[statGran] || [];
+    if (statGran === 'day' && statDay) periods = periods.filter(function (p) { return p.key === statDay; });
+
+    if (!periods.length) {
+      box.innerHTML = '<div class="hist-empty">' +
+        (statGran === 'day' && statDay ? 'Ngày này chưa có phiên nào.' : 'Chưa có phiên nào để thống kê.') + '</div>';
+      return;
+    }
+    box.innerHTML = periods.map(function (p) { return statCardHTML(p, statGran, 0); }).join('');
+  }
+
+  /** Đổ danh sách ngày có dữ liệu vào ô chọn (giữ lựa chọn hiện tại nếu còn). */
+  function fillDaySelect() {
+    var sel = $('statDay');
+    var days = (STATS && STATS.day) || [];
+    var opts = '<option value="">Tất cả ngày</option>' +
+      days.map(function (d) { return '<option value="' + d.key + '">' + esc(d.label) + '</option>'; }).join('');
+    if (sel.innerHTML !== opts) sel.innerHTML = opts;
+    if (statDay && !days.some(function (d) { return d.key === statDay; })) statDay = '';
+    sel.value = statDay;
+  }
+  function onDayChange() { statDay = $('statDay').value; renderStats(); }
+  /** Bung/thu chi tiết 1 thẻ kỳ. */
+  function onStatsClick(e) {
+    var head = e.target.closest('.stat-phead[data-act="toggle"]'); if (!head) return;
+    var card = head.closest('.stat-period');
+    var kids = card.querySelector(':scope > .stat-children'); if (!kids) return;
+    var open = kids.hidden;
+    kids.hidden = !open;
+    card.classList.toggle('open', open);
+    var caret = head.querySelector('.stat-caret'); if (caret) caret.textContent = open ? '▾' : '▸';
+  }
+  function renderHistory(h) {
+    HIST = h;                                   // P22: form nhập bù dùng để điền sẵn danh sách người
+    var cum = (h && h.cumulative) || [];
+    if (!cum.length) {
+      $('histCumulative').innerHTML = '<div class="hist-empty">Chưa có phiên nào được lưu.<br>Đóng 1 phiên để bắt đầu tích lũy 🏆</div>';
+    } else {
+      $('histCumulative').innerHTML = cum.map(function (r) {
+        var cls = r.netVND > 0 ? 'win' : r.netVND < 0 ? 'loss' : 'zero';
+        var medal = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : '#' + r.rank;
+        return '<div class="hcum-row">' +
+          '<span class="hcum-rank">' + medal + '</span>' +
+          '<span class="hcum-name">' + esc(r.name) + '<i>' + (r.sessions || 0) + ' phiên · ' + (r.wins || 0) + ' 🏆</i></span>' +
+          '<span class="hcum-net ' + cls + '">' + fmtSigned(r.netVND) + '</span>' +
+        '</div>';
+      }).join('');
+    }
+    var ss = (h && h.sessions) || [];
+    $('histSessions').innerHTML = ss.length ? ss.map(function (s) {
+      return '<div class="hsess-row" data-sid="' + esc(s.sessionId) + '" data-name="' + esc(s.name || 'Phiên') + '">' +
+        '<div class="hsess-main"><b>' + esc(s.name || 'Phiên') + '</b>' +
+          '<span>' + fmtDate(s.endedAt) + ' · ' + (s.playerCount || 0) + ' người</span></div>' +
+        '<div class="hsess-pot">pot ' + fmtVND(s.totalPotVND) + (s.gameType === 'tournament' ? ' · 🏆 Tour' : ' · 💵 Cash') + '</div>' +
+        (s.canCarry ? '<button class="hsess-carry" data-act="carry" title="Sang ngày mới: giữ người + chip còn lại, phiên này vẫn lưu">▶ Ngày mới</button>' : '') +
+        (s.canReopen ? '<button class="hsess-reopen" data-act="reopen" title="Dựng lại bàn để chơi tiếp (gộp vào phiên này)">↩ Mở lại</button>' : '') +
+        '<button class="hsess-del" data-act="del" title="Xoá phiên này khỏi lịch sử (không hoàn tác)">🗑</button>' +
+      '</div>';
+    }).join('') : '<div class="hist-empty">—</div>';
+  }
+  /** Hành động trên 1 phiên đã đóng: "Ngày mới" (P20), "Mở lại" (P18), "Xoá" (P23). */
+  function onSessionsClick(e) {
+    var btn = e.target.closest('[data-act]'); if (!btn) return;
+    var act = btn.getAttribute('data-act');
+    var row = e.target.closest('.hsess-row'); if (!row) return;
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var name = row.getAttribute('data-name') || 'phiên';
+    var sid = row.getAttribute('data-sid');
+    // Xoá chỉ đụng LỊCH SỬ -> không cần bàn trống (khác carry/reopen phải dựng lại bàn).
+    if (act === 'del') {
+      if (!confirm('XOÁ phiên "' + name + '" khỏi lịch sử?\n\n' +
+        '• Mất kết quả phiên này trong 📊 Thống kê · 📈 Biểu đồ · bảng tích lũy.\n' +
+        '• Bàn đang chơi KHÔNG bị ảnh hưởng.\n\n⚠ Không hoàn tác được.')) return;
+      mutate(srun('deleteSession', sid, passcode), '🗑 Đã xoá "' + name + '"')
+        .then(function () { refreshHistory(); });
+      return;
+    }
+    if (STATE && STATE.players.length) { toast('Bàn đang có người — đóng hoặc dọn bàn trước.', 'err'); return; }
+    if (act === 'carry') {
+      if (!confirm('Bắt đầu NGÀY MỚI từ "' + name + '"?\n\nApp tạo phiên mới rồi thêm lại mọi người với buy-in = số chip họ CÒN ở phiên đó. Phiên "' + name + '" VẪN được giữ trong lịch sử (biểu đồ tuần đủ mốc).')) return;
+      mutating++;
+      srun('carryOverSession', sid, passcode).then(function (state) {
+        render(state);
+        closeHistory();
+        toast('Đã sang ngày mới — giữ chip từ "' + name + '" ✓', 'ok');
+      }).catch(onError).then(function () { mutating--; });
+      return;
+    }
+    if (act === 'reopen') {
+      if (!confirm('Mở lại "' + name + '" để chơi tiếp?\n\nBàn sẽ được dựng lại y nguyên (người chơi, điểm chip, cấu hình, đồng hồ). Phiên này sẽ được gỡ khỏi lịch sử — đóng lại sau sẽ lưu mới.')) return;
+      mutating++;
+      srun('reopenSession', sid, passcode).then(function (state) {
+        render(state);
+        closeHistory();
+        toast('Đã mở lại "' + name + '" — chơi tiếp nhé ✓', 'ok');
+      }).catch(onError).then(function () { mutating--; });
+      return;
+    }
+  }
+  /** Xoá TOÀN BỘ lịch sử phiên (P23) — khoá xác nhận gõ "XOA HET" y như server. */
+  function onDeleteAllSessions() {
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var n = (HIST && HIST.sessions) ? HIST.sessions.length : 0;
+    if (!n) { toast('Chưa có phiên nào để xoá.', 'info'); return; }
+    var ans = prompt('XOÁ TOÀN BỘ ' + n + ' phiên trong lịch sử?\n\n' +
+      '• Mất sạch: 📊 Thống kê · 🏅 Vinh danh · 📈 Biểu đồ · bảng tích lũy.\n' +
+      '• GIỮ NGUYÊN: bàn đang chơi, cấu hình, BuyInLog.\n' +
+      '• ⚠ KHÔNG hoàn tác được.\n\nGõ chính xác:  XOA HET');
+    if (ans == null) return;
+    if (String(ans).trim().toUpperCase() !== 'XOA HET') { toast('Chưa xoá — gõ chưa đúng "XOA HET".', 'err'); return; }
+    mutate(srun('deleteAllSessions', 'XOA HET', passcode), '🗑 Đã xoá toàn bộ ' + n + ' phiên')
+      .then(function () { refreshHistory(); });
+  }
+
+  function renderResetBar() {
+    var bar = $('histResetBar');
+    if (!STATE) { bar.innerHTML = ''; return; }
+    if (!canEdit()) { bar.innerHTML = '<div class="hist-note">🔒 Nhập passcode để đóng phiên.</div>'; return; }
+    var n = STATE.players.length;
+    if (!n) { bar.innerHTML = '<div class="hist-note">Bàn đang trống — chơi xong bấm “Đóng phiên” để lưu vào lịch sử.</div>'; return; }
+    var balanced = STATE.imbalanceVND === 0;
+    bar.innerHTML =
+      '<div class="hist-reset">' +
+        '<div class="hist-reset-info"><b>Phiên hiện tại</b>' +
+          '<span>' + n + ' người · pot ' + fmtVND(STATE.potVND) + (balanced ? '' : ' · <i class="warn">Σ lệch</i>') + '</span></div>' +
+        '<button id="doResetBtn" class="btn btn-danger"' + (balanced ? '' : ' disabled') + '>⟳ Đóng phiên &amp; lưu</button>' +
+      '</div>' +
+      (balanced ? '' : '<div class="hist-note warn">Σ Lời-Lỗ đang lệch — cân lại chip cho = 0 mới đóng được phiên.</div>');
+    var b = $('doResetBtn');
+    if (b) b.addEventListener('click', doResetSession);
+  }
+  function doResetSession() {
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var n = STATE ? STATE.players.length : 0;
+    if (!confirm('Đóng phiên hiện tại (' + n + ' người)?\n\nKết quả sẽ đóng băng vào lịch sử, bàn dọn trống để bắt đầu phiên mới. (BuyInLog giữ nguyên.)')) return;
+    mutating++;
+    srun('resetSession', passcode).then(function (state) {
+      render(state);
+      toast('Đã đóng phiên & lưu lịch sử ✓', 'ok');
+      renderResetBar();
+      refreshHistory();
+    }).catch(onError).then(function () { mutating--; });
+  }
+
+  // ── Chia side pot khi all-in nhiều người (Phase 19) ────────
+  function openAllIn() {
+    if (!STATE) return;
+    buildAllinRows();
+    renderAllinResult();
+    $('allinModal').hidden = false;
+  }
+  function closeAllIn() { $('allinModal').hidden = true; }
+  function buildAllinRows() {
+    var ps = STATE.players || [];
+    $('allinRows').innerHTML = ps.length ? ps.map(function (p) {
+      return '<div class="allin-row" data-id="' + p.playerId + '">' +
+        '<label class="allin-pick"><input type="checkbox" class="allin-in" data-act="pick"><span>' + esc(p.name) + '</span></label>' +
+        '<span class="allin-have">có ' + p.currentChips + '</span>' +
+        '<span class="allin-f">cược <input class="allin-contrib" inputmode="numeric" data-act="f" value="' + p.currentChips + '"></span>' +
+        '<span class="allin-f">hạng <input class="allin-rank" inputmode="numeric" data-act="f" placeholder="1"></span>' +
+      '</div>';
+    }).join('') : '<div class="allin-note">Bàn đang trống — chưa có ai để chia pot.</div>';
+  }
+  function readAllinEntries() {
+    var out = [];
+    Array.prototype.forEach.call($('allinRows').querySelectorAll('.allin-row'), function (row) {
+      if (!row.querySelector('.allin-in').checked) return;
+      var rank = parseInt(row.querySelector('.allin-rank').value, 10);
+      out.push({ id: row.dataset.id, contrib: parseInt(row.querySelector('.allin-contrib').value, 10) || 0, rank: isNaN(rank) ? 0 : rank });
+    });
+    return out;
+  }
+  function renderAllinResult() {
+    var picks = readAllinEntries();
+    var valid = picks.filter(function (e) { return e.contrib > 0 && e.rank >= 1; });
+    var el = $('allinResult');
+    if (valid.length < 2) {
+      el.innerHTML = '<div class="allin-note">Tích ≥2 người, nhập chip cược (&gt;0) và hạng bài (1 = mạnh nhất).</div>';
+      $('allinApply').disabled = true; return;
+    }
+    var byId = {}; (STATE.players || []).forEach(function (p) { byId[p.playerId] = p; });
+    var res = cComputeSidePots(valid);
+    var pots = res.pots.map(function (pot, i) {
+      var wn = pot.winners.map(function (id) { return byId[id] ? esc(byId[id].name) : '?'; }).join(' + ');
+      return '<div class="allin-pot"><span>' + (i === 0 ? 'Pot chính' : 'Pot phụ ' + i) + ' <b>' + pot.amount + '</b></span><span class="ap-win">→ ' + wn + '</span></div>';
+    }).join('');
+    var rows = valid.map(function (e) {
+      var p = byId[e.id], payout = res.payouts[e.id] || 0;
+      var newPts = (p ? p.currentChips : 0) - e.contrib + payout, net = payout - e.contrib;
+      var cls = net > 0 ? 'win' : net < 0 ? 'loss' : 'zero';
+      return '<div class="allin-res-row"><span class="arn-name">' + esc(p ? p.name : '?') + '</span>' +
+        '<span class="arn-flow">cược ' + e.contrib + ' · nhận ' + payout + '</span>' +
+        '<span class="arn-new ' + cls + '">còn <b>' + newPts + '</b> (' + (net > 0 ? '+' : '') + net + ')</span></div>';
+    }).join('');
+    el.innerHTML = '<div class="allin-pots">' + pots + '</div><div class="allin-res-list">' + rows + '</div>';
+    $('allinApply').disabled = !canEdit();
+  }
+  function onAllinInput(e) { if (e.target.closest('[data-act]')) renderAllinResult(); }
+  function onAllinApply() {
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var valid = readAllinEntries().filter(function (e) { return e.contrib > 0 && e.rank >= 1; });
+    if (valid.length < 2) { toast('Cần ≥2 người có chip cược & hạng bài.', 'err'); return; }
+    var entries = valid.map(function (e) { return { playerId: e.id, contrib: e.contrib, rank: e.rank }; });
+    mutating++;
+    srun('applyAllIn', entries, passcode).then(function (state) {
+      render(state); toast('Đã chia pot & cập nhật chip ✓', 'ok'); closeAllIn();
+    }).catch(onError).then(function () { mutating--; });
+  }
+
+  // ── Poll nhẹ cho máy xem ───────────────────────────────────
+  function poll() {
+    if (document.hidden || mutating > 0 || Object.keys(dirtyChips).length) return;
+    srun('getRevision').then(function (rev) {
+      if (rev !== localRevision && mutating === 0) srun('getState').then(render).catch(onError);
+    }).catch(function () {});
+  }
+
+  // ── Mua chip của người khác (Phase 24) ─────────────────────
+  function xferNum(v) { var n = parseInt(String(v).replace(/[^\d]/g, ''), 10); return isNaN(n) ? 0 : n; }
+  function xferPlayer(id) { return (STATE && STATE.players || []).filter(function (p) { return p.playerId === id; })[0]; }
+  function openXfer() {
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var ps = (STATE && STATE.players) || [];
+    if (ps.length < 2) { toast('Cần ít nhất 2 người đang chơi để mua/bán chip.', 'err'); return; }
+    var opts = ps.map(function (p) { return '<option value="' + p.playerId + '">' + esc(p.name) + ' (' + p.currentChips + ' điểm)</option>'; }).join('');
+    $('xferBuyer').innerHTML = opts; $('xferSeller').innerHTML = opts;
+    $('xferBuyer').selectedIndex = 0; $('xferSeller').selectedIndex = 1;   // mặc định 2 người khác nhau
+    $('xferPts').value = '';
+    $('xferModal').hidden = false;
+    updateXferPreview();
+  }
+  function closeXfer() { $('xferModal').hidden = true; }
+  function updateXferPreview() {
+    var box = $('xferPreview');
+    var buyer = xferPlayer($('xferBuyer').value), seller = xferPlayer($('xferSeller').value), P = xferNum($('xferPts').value);
+    var mult = (STATE && STATE.config && STATE.config.chipRatio) || 1;
+    var unit = (STATE && STATE.config && STATE.config.buyInDefault) || 0;
+    box.className = 'xfer-preview';
+    if (!buyer || !seller) { box.textContent = ''; return; }
+    if (buyer.playerId === seller.playerId) { box.textContent = 'Người mua và người bán phải khác nhau.'; box.className = 'xfer-preview bad'; return; }
+    if (!P) { box.textContent = 'Nhập số điểm chip muốn chuyển.'; return; }
+    if (unit > 0 && P > unit) { box.textContent = 'Mỗi lần mua tối đa ' + unit + ' điểm (= 1 buy-in).'; box.className = 'xfer-preview bad'; return; }
+    if (P > seller.currentChips) { box.textContent = seller.name + ' chỉ còn ' + seller.currentChips + ' điểm, không bán được ' + P + '.'; box.className = 'xfer-preview bad'; return; }
+    box.innerHTML = '<b>' + esc(buyer.name) + '</b>: ' + buyer.currentChips + ' → <b class="up">' + (buyer.currentChips + P) + '</b> điểm<br>' +
+      '<b>' + esc(seller.name) + '</b>: ' + seller.currentChips + ' → <b class="down">' + (seller.currentChips - P) + '</b> điểm<br>' +
+      '<span style="color:var(--muted)">' + esc(buyer.name) + ' trả ' + esc(seller.name) + ' <b>' + fmtVND(P * mult) + '</b> (gộp vào quyết toán cuối)</span>';
+  }
+  function onXferGo() {
+    var buyerId = $('xferBuyer').value, sellerId = $('xferSeller').value, P = xferNum($('xferPts').value);
+    if (buyerId === sellerId) { toast('Người mua và người bán phải khác nhau.', 'err'); return; }
+    if (!P) { toast('Nhập số điểm chip.', 'err'); return; }
+    var buyer = xferPlayer(buyerId), seller = xferPlayer(sellerId);
+    closeXfer();
+    // transferChips(người BÁN, người MUA, điểm)
+    mutate(srun('transferChips', sellerId, buyerId, P, passcode),
+      '💱 ' + (buyer ? buyer.name : '?') + ' mua ' + P + ' điểm của ' + (seller ? seller.name : '?'));
+  }
+
+  // ── Đếm chip cả bàn (Phase 25) ─────────────────────────────
+  // Thay cho gõ từng ô trên danh sách (mỗi ô = 1 round-trip ~1–3s + re-render chặn gõ tiếp):
+  // điền hết → 1 lần gọi setChipsBulk → 1 lần render. Chỉ gửi người có chip ĐỔI so với lúc mở form.
+  function cntNum(v) { var s = String(v == null ? '' : v).replace(/[^\d]/g, ''); return s === '' ? null : parseInt(s, 10); }
+  /** Σ chip PHẢI có trên bàn = Σ buy-in − Σ cash-out (zero-sum; đúng cả cash lẫn tournament). */
+  function cntExpected() {
+    return ((STATE && STATE.players) || []).reduce(function (s, p) {
+      return s + (Number(p.totalBuyIn) || 0) - (Number(p.totalCashOut) || 0);
+    }, 0);
+  }
+  function openCount() {
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var ps = (STATE && STATE.players) || [];
+    if (!ps.length) { toast('Chưa có ai trên bàn.', 'err'); return; }
+    var elim = {};
+    (STATE.leaderboard || []).forEach(function (r) { if (r.eliminated) elim[r.playerId] = true; });
+    $('cntRows').innerHTML = ps.map(function (p) {
+      var out = !!elim[p.playerId];
+      return '<label class="cnt-row' + (out ? ' out' : '') + '" data-id="' + p.playerId + '" data-cur="' + p.currentChips + '">' +
+        '<span class="cnt-av" style="--c:' + esc(p.avatarColor || '#888') + '">' + esc(initial(p.name)) + '</span>' +
+        '<span class="cnt-name">' + esc(p.name) + (out ? ' 💀' : '') + '<i>hiện ' + p.currentChips + ' điểm' + (out ? ' · đã loại' : '') + '</i></span>' +
+        '<input class="cnt-inp" inputmode="numeric" value="' + p.currentChips + '"' + (out ? ' disabled' : '') + '>' +
+      '</label>';
+    }).join('');
+    $('countModal').hidden = false;
+    cntUpdateSum();
+    var first = $('cntRows').querySelector('.cnt-inp:not([disabled])');
+    if (first) { first.focus(); first.select(); }
+  }
+  function closeCount() { $('countModal').hidden = true; }
+  /** Đọc form → [{playerId, chips}] chỉ những người có chip đổi (ô trống / đã loại = bỏ qua). */
+  function cntChanged() {
+    var out = [];
+    Array.prototype.forEach.call($('cntRows').querySelectorAll('.cnt-row'), function (row) {
+      var inp = row.querySelector('.cnt-inp'); if (inp.disabled) return;
+      var v = cntNum(inp.value), cur = Number(row.dataset.cur) || 0;
+      if (v != null && v !== cur) out.push({ playerId: row.dataset.id, chips: v });
+    });
+    return out;
+  }
+  function cntUpdateSum() {
+    var sum = 0, changed = 0;
+    Array.prototype.forEach.call($('cntRows').querySelectorAll('.cnt-row'), function (row) {
+      var inp = row.querySelector('.cnt-inp'), cur = Number(row.dataset.cur) || 0;
+      var v = inp.disabled ? null : cntNum(inp.value);
+      var diff = v != null && v !== cur;
+      row.classList.toggle('changed', diff);
+      if (diff) changed++;
+      sum += (v == null ? cur : v);          // ô trống = giữ nguyên
+    });
+    var need = cntExpected(), d = sum - need, box = $('cntSum');
+    box.className = 'cnt-sum ' + (d === 0 ? 'ok' : 'bad');
+    box.innerHTML = 'Σ chip <b>' + fmtK(sum) + '</b> · trên bàn phải có <b>' + fmtK(need) + '</b> điểm · ' +
+      (d === 0 ? '✓ cân bằng' : 'lệch ' + (d > 0 ? '+' : '−') + fmtK(Math.abs(d)) + ' điểm') +
+      (changed ? ' · <b>' + changed + '</b> người đổi' : ' · chưa đổi ai');
+    $('cntSave').textContent = changed ? '💾 Lưu ' + changed + ' người' : '💾 Lưu';
+  }
+  function onCntInput(e) { if (e.target.classList.contains('cnt-inp')) cntUpdateSum(); }
+  function onCntFocus(e) { if (e.target.classList.contains('cnt-inp')) e.target.select(); }   // chạm vào = chọn hết, gõ đè
+  function onCntKeydown(e) {
+    if (e.key !== 'Enter' || !e.target.classList.contains('cnt-inp')) return;
+    e.preventDefault();
+    var inputs = Array.prototype.filter.call($('cntRows').querySelectorAll('.cnt-inp'), function (i) { return !i.disabled; });
+    var idx = inputs.indexOf(e.target);
+    if (idx >= 0 && idx < inputs.length - 1) { inputs[idx + 1].focus(); inputs[idx + 1].select(); }
+    else onCntSave();                       // Enter ở người cuối = Lưu
+  }
+  function onCntSave() {
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var entries = cntChanged();
+    if (!entries.length) { toast('Chưa đổi chip của ai.', 'info'); closeCount(); return; }
+    closeCount();
+    mutate(srun('setChipsBulk', entries, passcode), '🧮 Đã cập nhật chip ' + entries.length + ' người ✓');
+  }
+
+  // ── Nhập bù phiên cũ (Phase 22) ────────────────────────────
+  // Ghi thẳng vào lịch sử một buổi đã chơi nhưng quên nhập. Không đụng bàn đang chơi.
+  var BF_ROWS = [];                                   // [{name, buyIn, chipsEnd}] — nguồn sự thật của form
+  function bfDefaultBuyIn() { return (STATE && STATE.config && STATE.config.buyInDefault) || ''; }
+  function bfYesterday() {                            // 'YYYY-MM-DD' của hôm qua, theo giờ MÁY người dùng
+    var d = new Date(Date.now() - 86400000);
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function openBackfill() {
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    $('bfDate').value = bfYesterday();
+    BF_ROWS = [];
+    for (var i = 0; i < 3; i++) BF_ROWS.push({ name: '', buyIn: bfDefaultBuyIn(), chipsEnd: '' });
+    // Nút điền nhanh danh sách người đã từng chơi (từ bảng tích lũy vừa tải trong modal 📊)
+    var roster = (HIST && HIST.cumulative) ? HIST.cumulative.map(function (c) { return c.name; }) : [];
+    var fill = $('bfFill');
+    fill.hidden = !roster.length;
+    if (roster.length) fill.textContent = '📋 Điền sẵn ' + roster.length + ' người đã từng chơi';
+    $('backfillModal').hidden = false;
+    bfRender();
+  }
+  function closeBackfill() { $('backfillModal').hidden = true; }
+  function bfFillRoster() {
+    var roster = (HIST && HIST.cumulative) ? HIST.cumulative : [];
+    if (!roster.length) return;
+    BF_ROWS = roster.map(function (c) { return { name: c.name, buyIn: bfDefaultBuyIn(), chipsEnd: '' }; });
+    bfRender();
+  }
+  function bfRender() {
+    $('bfRows').innerHTML =
+      '<div class="bf-head"><span>Tên</span><span>Buy-in (điểm)</span><span>Chip cuối (điểm)</span><span></span></div>' +
+      BF_ROWS.map(function (r, i) {
+        return '<div class="bf-row" data-i="' + i + '">' +
+          '<input class="inp bf-name" maxlength="24" placeholder="Tên" value="' + esc(r.name) + '">' +
+          '<input class="inp inp-money bf-buy" inputmode="numeric" placeholder="Buy-in" value="' + esc(r.buyIn) + '">' +
+          '<input class="inp inp-money bf-end" inputmode="numeric" placeholder="Chip cuối" value="' + esc(r.chipsEnd) + '">' +
+          '<button type="button" class="bf-del" data-del="' + i + '" title="Xóa dòng">✕</button></div>';
+      }).join('');
+    bfUpdateSum();
+  }
+  /** Đọc input -> BF_ROWS (giữ nguyên thứ tự) rồi tính tổng. */
+  function bfSync() {
+    var rows = $('bfRows').querySelectorAll('.bf-row');
+    BF_ROWS = Array.prototype.map.call(rows, function (el) {
+      return {
+        name: el.querySelector('.bf-name').value,
+        buyIn: el.querySelector('.bf-buy').value,
+        chipsEnd: el.querySelector('.bf-end').value,
+      };
+    });
+  }
+  function bfNum(v) { var n = parseInt(String(v).replace(/[^\d-]/g, ''), 10); return isNaN(n) ? 0 : n; }
+  function bfUpdateSum() {
+    var sumBuy = 0, sumEnd = 0, filled = 0;
+    BF_ROWS.forEach(function (r) {
+      if (!String(r.name).trim()) return;
+      filled++; sumBuy += bfNum(r.buyIn); sumEnd += bfNum(r.chipsEnd);
+    });
+    var box = $('bfSum'), diff = sumEnd - sumBuy;
+    box.className = 'bf-sum ' + (filled < 2 ? '' : diff === 0 ? 'ok' : 'bad');
+    if (filled < 2) { box.textContent = 'Cần ít nhất 2 người chơi.'; return; }
+    box.textContent = 'Σ buy-in ' + fmtK(sumBuy) + ' điểm · Σ chip cuối ' + fmtK(sumEnd) + ' điểm · ' +
+      (diff === 0 ? '✓ cân bằng' : 'lệch ' + (diff > 0 ? '+' : '−') + fmtK(Math.abs(diff)) + ' điểm');
+  }
+  function onBfInput(e) {
+    if (!e.target.classList.contains('bf-name') && !e.target.classList.contains('bf-buy')
+      && !e.target.classList.contains('bf-end')) return;
+    bfSync(); bfUpdateSum();
+  }
+  function onBfRowsClick(e) {
+    var del = e.target.getAttribute && e.target.getAttribute('data-del');
+    if (del == null) return;
+    bfSync();
+    BF_ROWS.splice(Number(del), 1);
+    bfRender();
+  }
+  function onBfSave() {
+    bfSync();
+    var date = $('bfDate').value;
+    if (!date) { toast('Chọn ngày đã chơi.', 'err'); return; }
+    var entries = BF_ROWS.filter(function (r) { return String(r.name).trim(); })
+      .map(function (r) { return { name: String(r.name).trim(), buyIn: bfNum(r.buyIn), chipsEnd: bfNum(r.chipsEnd) }; });
+    if (entries.length < 2) { toast('Cần ít nhất 2 người chơi.', 'err'); return; }
+    var sumBuy = 0, sumEnd = 0;
+    entries.forEach(function (e2) { sumBuy += e2.buyIn; sumEnd += e2.chipsEnd; });
+    if (sumBuy !== sumEnd) { toast('Lệch ' + fmtK(sumEnd - sumBuy) + ' điểm — Σ buy-in phải bằng Σ chip cuối.', 'err'); return; }
+    closeBackfill();
+    mutate(srun('backfillSession', date, entries, passcode), '⏪ Đã nhập bù phiên ngày ' + date)
+      .then(function () { if (!$('histModal').hidden) refreshHistory(); });
+  }
+
+  // ── Biểu đồ diễn biến lời/lỗ (Phase 21) ────────────────────
+  // Gọi getWeeklyChart() (bọc wcBuild_ trong WeeklyChart.gs) rồi vẽ SVG.
+  // Port gần như nguyên xi từ weekly-chart/Dialog.html; đổi id/class sang tiền tố "wc"
+  // và map màu theo biến theme của app. Bọc IIFE để state riêng, không đụng scope app.
+  var WC = (function () {
+    var START = 0, DATES = [], WEEK_LABEL = '', UNIT = '', MU = '', BASE_LABEL = '', SNAMES = [];
+    var PLAYERS = [], N = 0, hidden = {}, hoverKey = null, geom = null, loaded = false;
+    function wq(id) { return document.getElementById(id); }
+    function fmt(n) { return Math.round(n).toLocaleString('de-DE'); }
+    function money(n) { return fmt(n) + MU; }
+    function sgnM(n) { return (n > 0 ? '+' : n < 0 ? '−' : '±') + fmt(Math.abs(n)) + MU; }
+    function polClass(n) { return n > 0 ? 'up' : n < 0 ? 'down' : 'flat'; }
+    function niceStep(rough) {
+      if (!(rough > 0)) return 1;
+      var pow = Math.pow(10, Math.floor(Math.log(rough) / Math.LN10));
+      var f = rough / pow, nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+      return nf * pow;
+    }
+    function cumMoneyAt(p, idx) { return idx <= 0 ? 0 : (p.money[idx - 1] || 0); }
+    function deltaMoneyAt(p, idx) { return idx <= 0 ? 0 : cumMoneyAt(p, idx) - cumMoneyAt(p, idx - 1); }
+    function visiblePlayers() { return PLAYERS.filter(function (p) { return !hidden[p.key]; }); }
+
+    function setData(data) {
+      var D = data || { dates: [], start: 0, weekLabel: '', players: [] };
+      START = D.start || 0; DATES = D.dates || []; WEEK_LABEL = D.weekLabel || '';
+      UNIT = D.unit || ''; MU = D.moneyUnit || ''; BASE_LABEL = D.baseLabel || ('xuất phát ' + START);
+      SNAMES = D.sessionNames || [];
+      PLAYERS = (D.players || []).map(function (p, i) {
+        var series = [START].concat(p.rem || []);
+        var mArr = p.money || [];
+        var netMoney = mArr.length ? mArr[mArr.length - 1] : (series[series.length - 1] - START);
+        return { key: 'p' + i, name: p.name, short: p.short || p.name, series: series, money: mArr,
+                 netMoney: netMoney, pol: netMoney > 0 ? 'up' : (netMoney < 0 ? 'down' : 'flat') };
+      });
+      N = DATES.length; hidden = {}; hoverKey = null; geom = null; loaded = true;
+      renderHeader(); buildLegend(); buildTable(); render();
+    }
+
+    function renderHeader() {
+      wq('wcWk').textContent = WEEK_LABEL;
+      if (!PLAYERS.length) { wq('wcInsight').textContent = 'Chưa có phiên nào để vẽ.'; wq('wcTiles').innerHTML = ''; return; }
+      var byMoney = PLAYERS.slice().sort(function (a, b) { return b.netMoney - a.netMoney; });
+      var leader = byMoney[0], worst = byMoney[byMoney.length - 1], spread = leader.netMoney - worst.netMoney;
+      var bestSwing = { d: -Infinity, pl: null, idx: 0 }, worstSwing = { d: Infinity, pl: null, idx: 0 };
+      PLAYERS.forEach(function (p) {
+        for (var i = 1; i < N; i++) {
+          var dd = deltaMoneyAt(p, i);
+          if (dd > bestSwing.d) bestSwing = { d: dd, pl: p, idx: i };
+          if (dd < worstSwing.d) worstSwing = { d: dd, pl: p, idx: i };
+        }
+      });
+      function sname(idx) { return SNAMES[idx - 1] || DATES[idx]; }
+      wq('wcInsight').innerHTML =
+        '<b>' + leader.short + '</b> lời nhiều nhất <b>' + sgnM(leader.netMoney) + '</b>. ' +
+        '<b>' + worst.short + '</b> lỗ nặng nhất ' + sgnM(worst.netMoney) + '. ' +
+        'Chênh lệch đôi bên <b>' + money(spread) + '</b>. ' +
+        (bestSwing.pl && bestSwing.d > 0 ? bestSwing.pl.short + ' phiên đỉnh (' + sgnM(bestSwing.d) + ' · ' + sname(bestSwing.idx) + '), ' : '') +
+        (worstSwing.pl && worstSwing.d < 0 ? worstSwing.pl.short + ' phiên tệ nhất (' + sgnM(worstSwing.d) + ').' : '');
+      var tiles = [
+        { c: 'up', lab: 'Lời nhiều nhất', val: leader.short, sub: sgnM(leader.netMoney) },
+        { c: 'down', lab: 'Lỗ nặng nhất', val: worst.short, sub: sgnM(worst.netMoney) },
+        { c: '', lab: 'Chênh lệch đôi bên', val: money(spread), sub: leader.short + ' vs ' + worst.short }
+      ];
+      wq('wcTiles').innerHTML = tiles.map(function (t) {
+        return '<div class="wc-tile ' + t.c + '"><div class="lab">' + t.lab + '</div><div class="val">' + t.val + '</div><div class="sub">' + t.sub + '</div></div>';
+      }).join('');
+    }
+
+    function render() {
+      if (!PLAYERS.length) return;
+      var svg = wq('wcSvg'), chartbox = wq('wcChartbox');
+      var W = chartbox.clientWidth || 900;
+      var H = Math.max(320, Math.min(520, Math.round(W * 0.56)));
+      var m = { l: 52, r: Math.min(96, Math.max(66, W * 0.12)), t: 16, b: 34 };
+      var plotW = W - m.l - m.r, plotH = H - m.t - m.b;
+      var maxV = START, minV = START;
+      PLAYERS.forEach(function (p) { p.series.forEach(function (v) { if (v > maxV) maxV = v; if (v < minV) minV = v; }); });
+      if (minV > 0) minV = 0;
+      var step = niceStep((maxV - minV) / 4) || 1;
+      var ymax = Math.ceil(maxV / step) * step, ymin = Math.floor(minV / step) * step;
+      if (ymax === ymin) ymax = ymin + step;
+      function X(i) { return m.l + (N === 1 ? 0 : i * plotW / (N - 1)); }
+      function Y(v) { return m.t + plotH * (1 - (v - ymin) / (ymax - ymin)); }
+      var parts = [];
+      parts.push('<g class="wc-grid">');
+      for (var g = ymin; g <= ymax + 0.5; g += step) {
+        var yy = Y(g);
+        parts.push('<line class="' + (g === 0 ? 'zero' : '') + '" x1="' + m.l + '" y1="' + yy + '" x2="' + (W - m.r) + '" y2="' + yy + '"/>');
+        parts.push('<text class="wc-tick" x="' + (m.l - 8) + '" y="' + (yy + 3.5) + '" text-anchor="end">' + fmt(g) + '</text>');
+      }
+      parts.push('</g>');
+      var yb = Y(START);
+      parts.push('<line class="wc-baseline" x1="' + m.l + '" y1="' + yb + '" x2="' + (W - m.r) + '" y2="' + yb + '"/>');
+      parts.push('<text class="wc-baselab" x="' + (W - m.r - 2) + '" y="' + (yb - 4) + '" text-anchor="end">' + BASE_LABEL + '</text>');
+      for (var i = 0; i < N; i++) { parts.push('<text class="wc-xtick" x="' + X(i) + '" y="' + (H - 14) + '">' + DATES[i] + '</text>'); }
+      parts.push('<line class="wc-crosshair" id="wcXh" x1="0" y1="' + m.t + '" x2="0" y2="' + (m.t + plotH) + '"/>');
+      var pts = {}, endItems = [];
+      parts.push('<g class="wc-lines">');
+      PLAYERS.forEach(function (p) {
+        var pp = p.series.map(function (v, i) { return { x: X(i), y: Y(v), v: v }; });
+        pts[p.key] = pp;
+        var d = pp.map(function (q, i) { return (i ? 'L' : 'M') + q.x.toFixed(1) + ' ' + q.y.toFixed(1); }).join(' ');
+        parts.push('<g class="wc-grp ' + p.pol + (hidden[p.key] ? ' hidden' : '') + '" data-key="' + p.key + '">');
+        parts.push('<path class="wc-line" d="' + d + '"/>');
+        pp.forEach(function (q) { parts.push('<circle class="wc-dot" cx="' + q.x.toFixed(1) + '" cy="' + q.y.toFixed(1) + '" r="3.5"/>'); });
+        var e = pp[pp.length - 1];
+        parts.push('<circle class="wc-enddot" cx="' + e.x.toFixed(1) + '" cy="' + e.y.toFixed(1) + '" r="3.6"/>');
+        if (!hidden[p.key]) endItems.push({ p: p, x: e.x, y0: e.y, y: e.y });
+        parts.push('</g>');
+      });
+      var minGap = 15, top = m.t + 6, bottom = m.t + plotH - 6;
+      endItems.sort(function (a, b) { return a.y - b.y; });
+      for (var k = 1; k < endItems.length; k++) { if (endItems[k].y - endItems[k - 1].y < minGap) endItems[k].y = endItems[k - 1].y + minGap; }
+      var over = endItems.length ? endItems[endItems.length - 1].y - bottom : 0;
+      if (over > 0) {
+        for (var a = 0; a < endItems.length; a++) endItems[a].y -= over;
+        for (var b = endItems.length - 2; b >= 0; b--) { if (endItems[b + 1].y - endItems[b].y < minGap) endItems[b].y = endItems[b + 1].y - minGap; }
+      }
+      if (endItems.length && endItems[0].y < top) {
+        var sh0 = top - endItems[0].y;
+        for (var cix = 0; cix < endItems.length; cix++) endItems[cix].y += sh0;
+        for (var e2 = 1; e2 < endItems.length; e2++) { if (endItems[e2].y - endItems[e2 - 1].y < minGap) endItems[e2].y = endItems[e2 - 1].y + minGap; }
+      }
+      var labX = W - m.r + 8;
+      parts.push(endItems.map(function (it) {
+        var ld = (Math.abs(it.y - it.y0) > 2)
+          ? '<line class="wc-leader" x1="' + (it.x + 3) + '" y1="' + it.y0 + '" x2="' + (labX - 3) + '" y2="' + it.y + '"/>' : '';
+        return '<g class="wc-grp ' + it.p.pol + '" data-key="' + it.p.key + '">' + ld +
+               '<text class="wc-endlab" x="' + labX + '" y="' + it.y + '">' + it.p.short + '</text></g>';
+      }).join(''));
+      parts.push('</g>');
+      parts.push('<rect id="wcCap" x="' + m.l + '" y="' + m.t + '" width="' + plotW + '" height="' + plotH + '" fill="transparent"/>');
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      svg.setAttribute('width', W); svg.setAttribute('height', H);
+      svg.innerHTML = parts.join('');
+      geom = { X: X, Y: Y, m: m, W: W, H: H, plotW: plotW, plotH: plotH, pts: pts, ymax: ymax, ymin: ymin };
+      var cap = wq('wcCap');
+      cap.addEventListener('pointermove', onMove);
+      cap.addEventListener('pointerdown', onMove);
+      cap.addEventListener('pointerleave', onLeave);
+      applyFocus(hoverKey);
+    }
+
+    function applyFocus(key) {
+      var svg = wq('wcSvg'), groups = svg.querySelectorAll('.wc-grp');
+      wq('wcChartbox').classList.toggle('has-focus', !!key);
+      for (var i = 0; i < groups.length; i++) {
+        groups[i].classList.toggle('focus', !!key && groups[i].getAttribute('data-key') === key);
+      }
+    }
+    function setHover(key) { if (key && hidden[key]) key = null; if (key === hoverKey) return; hoverKey = key; applyFocus(key); }
+    function onLeave() { setHover(null); var xh = wq('wcXh'); if (xh) xh.style.opacity = '0'; wq('wcTip').classList.remove('on'); }
+    function localXY(evt) {
+      var svg = wq('wcSvg'), r = svg.getBoundingClientRect(), sx = geom.W / r.width, sy = geom.H / r.height;
+      return { x: (evt.clientX - r.left) * sx, y: (evt.clientY - r.top) * sy };
+    }
+    function yAt(pp, t) { var i0 = Math.floor(t); if (i0 < 0) i0 = 0; if (i0 >= N - 1) i0 = N - 2; var f = t - i0; return pp[i0].y * (1 - f) + pp[i0 + 1].y * f; }
+    function onMove(evt) {
+      if (!geom) return;
+      var pos = localXY(evt);
+      var t = (N <= 1) ? 0 : (pos.x - geom.m.l) / (geom.plotW / (N - 1)); t = Math.max(0, Math.min(N - 1, t));
+      var idx = Math.round(t), best = null, bestD = 1e9;
+      visiblePlayers().forEach(function (p) { var dy = Math.abs(yAt(geom.pts[p.key], t) - pos.y); if (dy < bestD) { bestD = dy; best = p; } });
+      var focus = (best && bestD <= 22) ? best.key : null;
+      setHover(focus);
+      var xh = wq('wcXh'), xpx = geom.X(idx);
+      xh.setAttribute('x1', xpx); xh.setAttribute('x2', xpx); xh.style.opacity = '1';
+      if (focus) showSingleTip(best, idx); else showColumnTip(idx);
+    }
+    function rankAt(p, idx) { var v = p.series[idx], r = 1; visiblePlayers().forEach(function (q) { if (q.series[idx] > v) r++; }); return r; }
+    function headDate(idx) { return idx <= 0 ? 'Đầu' : (SNAMES[idx - 1] ? SNAMES[idx - 1] : DATES[idx]); }
+    function showSingleTip(p, idx) {
+      var stack = p.series[idx], cum = cumMoneyAt(p, idx), dPrev = deltaMoneyAt(p, idx);
+      var html = '<div class="th"><span>' + p.name + '</span><span class="d">' + headDate(idx) + '</span></div>' +
+        '<div class="big">' + fmt(stack) + ' <span style="font-size:12px;color:var(--muted);font-weight:500">' + UNIT + '</span></div>' +
+        '<div class="meta">Lời/lỗ tích lũy: <span class="' + polClass(cum) + '">' + sgnM(cum) + '</span>' +
+        (idx > 0 ? '<br>Phiên này: <span class="' + polClass(dPrev) + '">' + sgnM(dPrev) + '</span>' : '') +
+        '<br>Hạng: <b>#' + rankAt(p, idx) + '</b>/' + visiblePlayers().length + '</div>';
+      placeTip(html, geom.X(idx), yAt(geom.pts[p.key], idx));
+    }
+    function showColumnTip(idx) {
+      var rows = visiblePlayers().slice().sort(function (a, b) { return b.series[idx] - a.series[idx]; });
+      var html = '<div class="th"><span>Xếp hạng</span><span class="d">' + headDate(idx) + '</span></div>';
+      rows.forEach(function (p) {
+        var dPrev = deltaMoneyAt(p, idx);
+        html += '<div class="row"><span class="nm">' + p.short + '</span><span class="vv">' + fmt(p.series[idx]) +
+          (idx > 0 && dPrev !== 0 ? ' <span class="' + polClass(dPrev) + '" style="font-size:11px">' + sgnM(dPrev) + '</span>' : '') + '</span></div>';
+      });
+      placeTip(html, geom.X(idx), geom.m.t + 10);
+    }
+    function placeTip(html, anchorX, anchorY) {
+      var svg = wq('wcSvg'), tip = wq('wcTip');
+      tip.innerHTML = html; tip.classList.add('on');
+      var r = svg.getBoundingClientRect(), scale = r.width / geom.W;
+      var ax = anchorX * scale, ay = anchorY * scale, tw = tip.offsetWidth, th = tip.offsetHeight;
+      var left = ax + 14; if (left + tw > r.width - 4) left = ax - tw - 14; if (left < 4) left = 4;
+      var top = ay - th / 2; if (top < 4) top = 4; if (top + th > r.height - 4) top = r.height - th - 4;
+      tip.style.left = left + 'px'; tip.style.top = top + 'px';
+    }
+
+    function buildLegend() {
+      var order = PLAYERS.slice().sort(function (a, b) { return b.netMoney - a.netMoney; });
+      wq('wcLegend').innerHTML = order.map(function (p) {
+        return '<span class="wc-chip ' + p.pol + (hidden[p.key] ? ' off' : '') + '" data-key="' + p.key + '" role="button" tabindex="0" aria-pressed="' + (!hidden[p.key]) + '">' +
+          '<span class="sw"></span><span class="cn">' + p.short + '</span><span class="cnet">' + sgnM(p.netMoney) + '</span></span>';
+      }).join('');
+      Array.prototype.forEach.call(wq('wcLegend').children, function (ch) {
+        var key = ch.getAttribute('data-key');
+        ch.addEventListener('click', function () { toggleHide(key); });
+        ch.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleHide(key); } });
+        ch.addEventListener('mouseenter', function () { if (!hidden[key]) setHover(key); });
+        ch.addEventListener('mouseleave', function () { setHover(null); wq('wcTip').classList.remove('on'); var xh = wq('wcXh'); if (xh) xh.style.opacity = '0'; });
+      });
+    }
+    function toggleHide(key) { hidden[key] = !hidden[key]; if (hidden[key] && hoverKey === key) hoverKey = null; render(); buildLegend(); buildTable(); }
+
+    function buildTable() {
+      if (!PLAYERS.length) { wq('wcTblwrap').innerHTML = ''; return; }
+      var head = '<tr><th>Người</th>' + DATES.map(function (d) { return '<th>' + d + '</th>'; }).join('') + '<th>Lời/Lỗ (' + MU + ')</th></tr>';
+      var body = PLAYERS.slice().sort(function (a, b) { return b.netMoney - a.netMoney; }).map(function (p) {
+        var tds = p.series.map(function (v) { return '<td>' + fmt(v) + '</td>'; }).join('');
+        return '<tr><td>' + p.name + '</td>' + tds + '<td class="net ' + p.pol + '">' + sgnM(p.netMoney) + '</td></tr>';
+      }).join('');
+      wq('wcTblwrap').innerHTML = '<table><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+    }
+
+    function showState(msg) { var s = wq('wcState'); s.textContent = msg; s.hidden = false; wq('wcApp').hidden = true; }
+
+    // ── Chọn kỳ: '' = tuần mới nhất (mặc định) · 'all' = tất cả · 'YYYY-MM-DD' = 1 tuần ──
+    var weekKey = '', WEEKS = [];
+    function buildWeekSel(weeks, cur) {
+      WEEKS = weeks || [];
+      var sel = wq('wcWeekSel');
+      sel.innerHTML = WEEKS.map(function (w) {
+        return '<option value="' + w.key + '">' + w.label + ' (' + w.sessions + ' phiên)</option>';
+      }).join('') + '<option value="all">Tất cả các phiên</option>';
+      sel.value = cur;
+      wq('wcWeeks').hidden = !(WEEKS.length > 1 || cur === 'all');
+      // WEEKS xếp MỚI NHẤT trước ⇒ ◀ (tuần trước) = index+1, ▶ (tuần sau) = index−1.
+      var i = WEEKS.map(function (w) { return w.key; }).indexOf(cur);
+      wq('wcPrev').disabled = !(i >= 0 && i < WEEKS.length - 1);
+      wq('wcNext').disabled = !(i > 0);
+    }
+    function step(delta) {                       // delta +1 = lùi về tuần cũ hơn
+      var i = WEEKS.map(function (w) { return w.key; }).indexOf(weekKey);
+      if (i < 0) return;
+      var j = i + delta;
+      if (j < 0 || j >= WEEKS.length) return;
+      weekKey = WEEKS[j].key; load();
+    }
+    function load() {
+      showState('Đang tải…');
+      srun('getWeeklyChart', weekKey).then(function (data) {
+        if (!data || !data.players || !data.players.length) {
+          if (data && data.weeks) buildWeekSel(data.weeks, data.weekKey || 'all');
+          showState('Kỳ này chưa có phiên nào để vẽ. Chọn kỳ khác hoặc đóng thêm 1 phiên.');
+          return;
+        }
+        weekKey = data.weekKey || '';
+        buildWeekSel(data.weeks, weekKey);
+        wq('wcState').hidden = true; wq('wcApp').hidden = false;
+        setData(data);
+      }).catch(function (e) {
+        showState('Không vẽ được biểu đồ: ' + ((e && e.message) ? e.message : e));
+      });
+    }
+    function open() {
+      wq('chartModal').hidden = false;
+      weekKey = '';                              // mỗi lần mở: về TUẦN MỚI NHẤT
+      wq('wcWeeks').hidden = true;
+      load();
+    }
+    function close() { wq('chartModal').hidden = true; }
+
+    wq('wcWeekSel').addEventListener('change', function () { weekKey = this.value; load(); });
+    wq('wcPrev').addEventListener('click', function () { step(1); });    // ◀ tuần cũ hơn
+    wq('wcNext').addEventListener('click', function () { step(-1); });   // ▶ tuần mới hơn
+    wq('wcTblBtn').addEventListener('click', function () {
+      var w = wq('wcTblwrap'), on = w.classList.toggle('wc-hidden');
+      this.textContent = on ? 'Xem bảng số liệu' : 'Ẩn bảng số liệu';
+      this.setAttribute('aria-expanded', String(!on));
+    });
+    var rAF = null;
+    window.addEventListener('resize', function () {
+      if (!loaded || wq('chartModal').hidden) return;
+      if (rAF) cancelAnimationFrame(rAF); rAF = requestAnimationFrame(render);
+    });
+    return { open: open, close: close };
+  })();
+
+  // ── Khởi động ──────────────────────────────────────────────
+  function boot() {
+    try { var t = localStorage.getItem('pokerTheme'); if (t) applyTheme(t); } catch (e) {}
+    $('addBtn').addEventListener('click', function () {
+      if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+      toggleAdd($('addForm').hidden);
+    });
+    $('addCancel').addEventListener('click', function () { toggleAdd(false); });
+    $('addForm').addEventListener('submit', onAddSubmit);
+    $('addBuyIn').addEventListener('input', updateAddHint);
+    $('bulkToggle').addEventListener('click', function () { setBulkMode($('addBulk').hidden); });
+    $('addBulkCancel').addEventListener('click', function () { setBulkMode(false); });
+    $('addBulkGo').addEventListener('click', onBulkGo);
+    $('addBulkNames').addEventListener('input', updateBulkCount);
+    $('themeBtn').addEventListener('click', cycleTheme);
+    $('lockBtn').addEventListener('click', onLockClick);
+    $('histBtn').addEventListener('click', openHistory);
+    $('histClose').addEventListener('click', closeHistory);
+    $('histModal').addEventListener('click', function (e) { if (e.target.dataset && e.target.dataset.close) closeHistory(); });
+    $('allinBtn').addEventListener('click', openAllIn);
+    $('allinClose').addEventListener('click', closeAllIn);
+    $('allinModal').addEventListener('click', function (e) { if (e.target.dataset && e.target.dataset.close) closeAllIn(); });
+    $('xferBtn').addEventListener('click', openXfer);
+    $('xferClose').addEventListener('click', closeXfer);
+    $('xferModal').addEventListener('click', function (e) { if (e.target.dataset && e.target.dataset.close) closeXfer(); });
+    $('xferBuyer').addEventListener('change', updateXferPreview);
+    $('xferSeller').addEventListener('change', updateXferPreview);
+    $('xferPts').addEventListener('input', updateXferPreview);
+    $('xferGo').addEventListener('click', onXferGo);
+    $('countBtn').addEventListener('click', openCount);
+    $('cntClose').addEventListener('click', closeCount);
+    $('cntCancel').addEventListener('click', closeCount);
+    $('countModal').addEventListener('click', function (e) { if (e.target.dataset && e.target.dataset.close) closeCount(); });
+    $('cntRows').addEventListener('input', onCntInput);
+    $('cntRows').addEventListener('focusin', onCntFocus);
+    $('cntRows').addEventListener('keydown', onCntKeydown);
+    $('cntSave').addEventListener('click', onCntSave);
+    $('chartBtn').addEventListener('click', WC.open);
+    $('chartClose').addEventListener('click', WC.close);
+    $('chartModal').addEventListener('click', function (e) { if (e.target.dataset && e.target.dataset.close) WC.close(); });
+    $('bfOpen').addEventListener('click', openBackfill);
+    $('bfClose').addEventListener('click', closeBackfill);
+    $('backfillModal').addEventListener('click', function (e) { if (e.target.dataset && e.target.dataset.close) closeBackfill(); });
+    $('bfFill').addEventListener('click', bfFillRoster);
+    $('bfAddRow').addEventListener('click', function () { bfSync(); BF_ROWS.push({ name: '', buyIn: bfDefaultBuyIn(), chipsEnd: '' }); bfRender(); });
+    $('bfRows').addEventListener('input', onBfInput);
+    $('bfRows').addEventListener('click', onBfRowsClick);
+    $('bfSave').addEventListener('click', onBfSave);
+    $('delAllBtn').addEventListener('click', onDeleteAllSessions);
+    $('allinRows').addEventListener('input', onAllinInput);
+    $('allinRows').addEventListener('change', onAllinInput);
+    $('allinApply').addEventListener('click', onAllinApply);
+    $('statGran').addEventListener('click', onGranClick);
+    $('statDay').addEventListener('change', onDayChange);
+    $('histStats').addEventListener('click', onStatsClick);
+    $('histSessions').addEventListener('click', onSessionsClick);
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (!$('histModal').hidden) closeHistory();
+      if (!$('allinModal').hidden) closeAllIn();
+      if (!$('xferModal').hidden) closeXfer();
+      if (!$('countModal').hidden) closeCount();
+      if (!$('chartModal').hidden) WC.close();
+      if (!$('backfillModal').hidden) closeBackfill();
+    });
+    $('cfgEditBtn').addEventListener('click', function () { if ($('cfgForm').hidden) openCfgForm(); else $('cfgForm').hidden = true; });
+    $('cfgCancel').addEventListener('click', function () { $('cfgForm').hidden = true; });
+    $('cfgGameType').addEventListener('change', togglePayoutField);
+    ['cfgBuyIn', 'cfgSB', 'cfgBB', 'cfgRatio', 'cfgDenoms'].forEach(function (id) { $(id).addEventListener('input', updateCfgHints); });
+    $('cfgForm').addEventListener('submit', onCfgSubmit);
+    $('clockCtrls').addEventListener('click', onClockClick);
+    setInterval(tickClock, 1000);                     // đồng hồ blind chạy mượt phía client
+    $('playerList').addEventListener('click', onListClick);
+    $('playerList').addEventListener('input', onListInput);
+    $('playerList').addEventListener('change', onListInput);
+    $('settleBody').addEventListener('click', onSettleClick);
+
+    showLoading(true);
+    srun('getState').then(function (s) { showLoading(false); render(s); })
+      .catch(function (e) { showLoading(false); onError(e); });
+    setInterval(poll, 10000);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+</script>
+
+</body>
+</html>
