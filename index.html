@@ -47,24 +47,30 @@
   /* ── Top bar ─────────────────────────────────────────────── */
   .topbar {
     position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between;
-    gap:12px; padding:12px 16px; background:rgba(11,14,12,.72); backdrop-filter:blur(10px);
-    border-bottom:1px solid var(--hairline);
+    gap:10px 12px; padding:12px 16px; background:rgba(11,14,12,.72); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--hairline); flex-wrap:wrap;
   }
   .brand { font-size:17px; font-weight:800; letter-spacing:.5px; display:flex; align-items:center; gap:8px; }
   .brand .suit { font-size:19px; color:var(--accent); }
   .brand .suit .red { color:var(--loss); }
   .brand .sub { font-size:11px; font-weight:600; color:var(--muted); letter-spacing:.6px; text-transform:uppercase; }
-  .topbar-right { display:flex; align-items:center; gap:10px; }
+  .topbar-right { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
   .live { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--muted); }
   .live .dot { width:8px; height:8px; border-radius:50%; background:var(--win); box-shadow:0 0 8px var(--win); animation:pulse 2s infinite; }
   .live .synced { color:var(--muted); font-weight:600; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  /* P27: nút topbar có NHÃN CHỮ kèm icon (chỉ icon thì khó đoán chức năng).
+     Nút ✕ đóng modal cũng dùng class này nhưng không có .ib-lab -> vẫn vuông 38px như cũ. */
   .icon-btn {
+    display:inline-flex; align-items:center; justify-content:center; gap:7px;
     border:1px solid var(--hairline); background:var(--raised); color:var(--text); border-radius:10px;
-    width:38px; height:38px; font-size:17px; cursor:pointer; transition:transform .12s, border-color .12s;
+    min-width:38px; height:38px; padding:0 10px; font-size:17px; font-family:inherit; font-weight:700;
+    cursor:pointer; white-space:nowrap; transition:transform .12s, border-color .12s;
   }
   .icon-btn:hover { border-color:var(--accent); transform:translateY(-1px); }
   .icon-btn:active { transform:scale(.94); }
+  .ib-ico { font-size:16px; line-height:1; }
+  .ib-lab { font-size:12.5px; letter-spacing:.2px; }
 
   /* ── Layout ──────────────────────────────────────────────── */
   #app { max-width:820px; margin:0 auto; padding:16px; display:flex; flex-direction:column; gap:16px; }
@@ -458,6 +464,32 @@
   .bf-sum.bad { color:var(--loss); border-color:var(--loss); }
   .bf-actions { display:flex; justify-content:flex-end; }
 
+  /* ── Mở lại phiên: chọn cách (Phase 27) ──────────────────── */
+  .rx-target { font-size:13px; color:var(--muted); }
+  .rx-target b { color:var(--text); }
+  .rx-opts { display:flex; flex-direction:column; gap:10px; }
+  .rx-opt { display:flex; gap:11px; align-items:flex-start; text-align:left; width:100%;
+    padding:12px 13px; border-radius:12px; border:1px solid var(--hairline); background:var(--raised);
+    color:var(--text); cursor:pointer; font:inherit; transition:border-color .12s, transform .1s; }
+  .rx-opt:hover { border-color:var(--accent); transform:translateY(-1px); }
+  .rx-opt:active { transform:scale(.99); }
+  .rx-opt.ghost { background:transparent; opacity:.85; }
+  .rx-ico { font-size:20px; line-height:1.2; flex:0 0 auto; }
+  .rx-body { display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .rx-body b { font-size:14px; }
+  .rx-body i { font-style:normal; font-size:12px; line-height:1.55; color:var(--muted); }
+  .rx-body i b { color:var(--text); font-weight:700; }
+  /* Băng "phiên này sẽ lưu vào ngày …" trên thanh Đóng phiên */
+  .hist-pending { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    padding:10px 12px; margin-bottom:10px; border-radius:12px;
+    border:1px solid var(--accent); background:rgba(212,175,55,.1); }
+  .hp-main { display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .hp-main b { font-size:13px; color:var(--accent-bright); }
+  .hp-main span { font-size:11.5px; color:var(--muted); }
+  .hp-clear { flex:0 0 auto; border:1px solid var(--hairline); background:var(--raised); color:var(--muted);
+    font-size:12px; font-weight:700; padding:6px 10px; border-radius:8px; cursor:pointer; white-space:nowrap; }
+  .hp-clear:hover { border-color:var(--loss); color:var(--loss); }
+
   /* ── Đếm chip cả bàn (Phase 25) ──────────────────────────── */
   .cnt-hint { font-size:12.5px; line-height:1.6; color:var(--muted); }
   .cnt-hint b { color:var(--text); }
@@ -508,6 +540,27 @@
   .wc-tile .val { font-size:19px; font-weight:700; margin-top:3px; line-height:1.15; color:var(--text); }
   .wc-tile .sub { font-size:12px; color:var(--muted); margin-top:2px; }
   .wc-tile.up .val { color:var(--wc-up); } .wc-tile.down .val { color:var(--wc-down); }
+
+  .wc-tile.buy .val { color:var(--accent-bright); }
+  /* P28 — nút đổi kiểu tô màu + "mỗi người 1 màu" (biến --pc gắn trên từng .wc-grp) */
+  .wc-colorbtn { margin-left:auto; }
+  .wc-lnk.on { border-color:var(--accent); color:var(--accent-bright); }
+  #wcChartbox.wc-colored .wc-grp .wc-line { stroke:var(--pc, var(--wc-flat)); }
+  #wcChartbox.wc-colored .wc-grp .wc-dot,
+  #wcChartbox.wc-colored .wc-grp .wc-enddot { fill:var(--pc, var(--wc-flat)); }
+  #wcChartbox.wc-colored .wc-grp .wc-endlab { fill:var(--pc, var(--muted)); }
+  /* P28 — dải "từng phiên: ai lời nhiều nhất · ai lỗ nặng nhất" */
+  .wc-days { display:flex; flex-direction:column; margin:10px 0 2px;
+    border:1px solid var(--hairline); border-radius:12px; overflow:hidden; background:var(--raised); }
+  .wc-days-head { padding:7px 12px; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--muted); font-weight:700; background:rgba(0,0,0,.16); border-bottom:1px solid var(--hairline); }
+  .wc-day { display:grid; grid-template-columns:minmax(74px,auto) 1fr 1fr; gap:10px; align-items:center;
+    padding:7px 12px; border-bottom:1px solid var(--hairline); font-size:12.5px; }
+  .wc-day:last-child { border-bottom:0; }
+  .wd-date { font-weight:700; color:var(--text); white-space:nowrap; }
+  .wd-date i { font-style:normal; font-weight:600; color:var(--muted); font-size:11px; }
+  .wd-win { color:var(--wc-up, var(--win)); } .wd-loss { color:var(--wc-down, var(--loss)); text-align:right; }
+  .wd-win b, .wd-loss b { font-weight:800; }
 
   .wc-chartbox { position:relative; margin-top:8px; }
   .wc svg { display:block; width:100%; height:auto; touch-action:none; }
@@ -591,6 +644,9 @@
     .bf-row .bf-name { grid-area:nm; } .bf-row .bf-buy { grid-area:buy; } .bf-row .bf-end { grid-area:end; }
     .bf-row .bf-del { grid-area:del; }
     .bf-head { display:none; }
+    .wc-day { grid-template-columns:1fr 1fr; grid-template-areas:"date date" "win loss"; gap:2px 10px; }
+    .wd-date { grid-area:date; } .wd-win { grid-area:win; } .wd-loss { grid-area:loss; }
+    .wc-colorbtn { margin-left:0; }
   }
   @media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
 </style>
@@ -604,12 +660,12 @@
     </div>
     <div class="topbar-right">
       <span class="live"><i class="dot"></i> LIVE <span id="synced" class="synced"></span></span>
-      <button id="allinBtn" class="icon-btn" title="Chia pot khi all-in nhiều người">💥</button>
-      <button id="xferBtn" class="icon-btn" title="Mua chip của người khác (khi chạm trần buy-in)">💱</button>
-      <button id="histBtn" class="icon-btn" title="Lịch sử &amp; bảng tích lũy">📊</button>
-      <button id="chartBtn" class="icon-btn" title="Biểu đồ diễn biến lời/lỗ qua các phiên">📈</button>
-      <button id="lockBtn" class="icon-btn" title="Nhập passcode để sửa" hidden>🔒</button>
-      <button id="themeBtn" class="icon-btn" title="Đổi theme">🎨</button>
+      <button id="allinBtn" class="icon-btn" title="Chia pot khi all-in nhiều người"><span class="ib-ico">💥</span><span class="ib-lab">Chia pot</span></button>
+      <button id="xferBtn" class="icon-btn" title="Mua chip của người khác (khi chạm trần buy-in)"><span class="ib-ico">💱</span><span class="ib-lab">Mua chip</span></button>
+      <button id="histBtn" class="icon-btn" title="Lịch sử &amp; bảng tích lũy"><span class="ib-ico">📊</span><span class="ib-lab">Lịch sử</span></button>
+      <button id="chartBtn" class="icon-btn" title="Biểu đồ diễn biến lời/lỗ qua các phiên"><span class="ib-ico">📈</span><span class="ib-lab">Biểu đồ</span></button>
+      <button id="lockBtn" class="icon-btn" title="Nhập passcode để sửa" hidden><span class="ib-ico">🔒</span><span class="ib-lab">Khoá</span></button>
+      <button id="themeBtn" class="icon-btn" title="Đổi theme (Casino Felt · Luxe Vault · Dark Neon)"><span class="ib-ico">🎨</span><span class="ib-lab">Giao diện</span></button>
     </div>
   </header>
 
@@ -833,6 +889,37 @@
     </div>
   </div>
 
+  <!-- Modal: chọn CÁCH mở lại 1 phiên đã đóng (Phase 27) -->
+  <div id="reopenModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>↩ Mở lại phiên</h2>
+        <button id="rxClose" class="icon-btn" title="Đóng">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="rxTarget" class="rx-target"></div>
+        <div id="rxOpts" class="rx-opts">
+          <button type="button" class="rx-opt" data-rx="edit">
+            <span class="rx-ico">✏️</span>
+            <span class="rx-body"><b>Sửa phiên này</b>
+              <i>Dựng lại bàn để sửa số. Đóng lại sẽ ghi <b>đúng chỗ cũ</b> — giữ nguyên ngày, giờ và tên phiên, lịch sử không xê dịch.</i></span>
+          </button>
+          <button type="button" class="rx-opt" data-rx="continue">
+            <span class="rx-ico">➕</span>
+            <span class="rx-body"><b>Chơi tiếp ngày đó</b>
+              <i>Giữ nguyên phiên cũ, mở bàn mới với <b>chip còn lại</b>. Đóng lại tạo <b>phiên thứ 2 CÙNG NGÀY</b> (giờ muộn hơn).</i></span>
+          </button>
+          <button type="button" class="rx-opt ghost" data-rx="now">
+            <span class="rx-ico">↩</span>
+            <span class="rx-body"><b>Mở lại &amp; tính vào hôm nay</b>
+              <i>Cách cũ: gỡ phiên khỏi lịch sử, đóng lại đóng dấu ngày <b>hôm nay</b>. Chỉ dùng khi lỡ đóng nhầm phiên của chính hôm nay.</i></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Nhập bù phiên cũ (Phase 22) — ghi thẳng vào lịch sử, KHÔNG đụng bàn đang chơi -->
   <div id="backfillModal" class="modal" hidden>
     <div class="modal-backdrop" data-close="1"></div>
@@ -887,9 +974,12 @@
           <div class="wc-head">
             <h3 class="wc-title">Diễn biến chip qua các phiên</h3>
             <span class="wc-wk" id="wcWk"></span>
+            <button type="button" id="wcColorBtn" class="wc-lnk wc-colorbtn" aria-pressed="false"
+              title="Đổi cách tô màu: theo lời/lỗ (xanh/đỏ) hoặc mỗi người một màu riêng">🎨 Màu lời/lỗ</button>
           </div>
           <p class="wc-insight" id="wcInsight"></p>
           <div class="wc-tiles" id="wcTiles"></div>
+          <div class="wc-days" id="wcDays"></div>
           <div class="wc-chartbox" id="wcChartbox">
             <svg id="wcSvg" role="img" aria-label="Biểu đồ đường diễn biến lời/lỗ của từng người qua các phiên đã đóng"></svg>
             <div class="wc-tip" id="wcTip"></div>
@@ -1087,7 +1177,9 @@
     var btn = $('lockBtn');
     btn.hidden = !required;
     if (required) {
-      btn.textContent = ok ? '🔓' : '🔒';
+      var ico = btn.querySelector('.ib-ico'), lab = btn.querySelector('.ib-lab');
+      if (ico) ico.textContent = ok ? '🔓' : '🔒';          // giữ nhãn chữ (P27) — đừng ghi đè cả nút
+      if (lab) lab.textContent = ok ? 'Mở khoá' : 'Khoá';
       btn.title = ok ? 'Đang mở khóa — bấm để khóa lại' : 'Nhập passcode để chỉnh sửa';
     }
   }
@@ -1869,16 +1961,55 @@
       }).catch(onError).then(function () { mutating--; });
       return;
     }
-    if (act === 'reopen') {
-      if (!confirm('Mở lại "' + name + '" để chơi tiếp?\n\nBàn sẽ được dựng lại y nguyên (người chơi, điểm chip, cấu hình, đồng hồ). Phiên này sẽ được gỡ khỏi lịch sử — đóng lại sau sẽ lưu mới.')) return;
+    if (act === 'reopen') { openReopen(sid, name); return; }   // P27: hỏi cách mở lại
+  }
+
+  // ── Mở lại phiên: chọn cách (Phase 27) ─────────────────────
+  // 3 lối: ✏️ sửa đúng chỗ cũ (giữ ngày+tên) · ➕ chơi tiếp ngày đó (thêm phiên cùng ngày)
+  // · ↩ mở lại kiểu cũ (đóng lại tính vào hôm nay).
+  var RX = { sid: '', name: '' };
+  /** Server đã có P27 chưa? Bản mới luôn trả pendingStamp (null hoặc object); bản cũ KHÔNG có key. */
+  function serverHasStamp() { return !!STATE && typeof STATE.pendingStamp !== 'undefined'; }
+  function openReopen(sid, name) {
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    if (STATE && STATE.players.length) { toast('Bàn đang có người — đóng hoặc dọn bàn trước.', 'err'); return; }
+    // Server cũ bỏ qua tham số mode ⇒ "Sửa phiên này" sẽ ÂM THẦM đóng dấu hôm nay (mất ngày gốc).
+    // Thà chạy đúng kiểu cũ + báo rõ, còn hơn cho bấm rồi sai ngày mà không ai biết.
+    if (!serverHasStamp()) {
+      toast('Server chưa cập nhật Phase 27 — chỉ mở lại được kiểu cũ (đóng lại tính vào hôm nay).', 'err');
+      if (!confirm('Mở lại "' + name + '" theo cách CŨ?\n\nPhiên bị gỡ khỏi lịch sử và khi đóng lại sẽ đóng dấu ngày HÔM NAY.\n\n(Muốn "Sửa phiên giữ nguyên ngày" thì dán code Phase 27 lên Apps Script rồi Phiên bản mới.)')) return;
       mutating++;
       srun('reopenSession', sid, passcode).then(function (state) {
-        render(state);
-        closeHistory();
-        toast('Đã mở lại "' + name + '" — chơi tiếp nhé ✓', 'ok');
+        render(state); closeHistory(); toast('Đã mở lại "' + name + '"', 'ok');
       }).catch(onError).then(function () { mutating--; });
       return;
     }
+    RX = { sid: sid, name: name };
+    $('rxTarget').innerHTML = 'Phiên đã chọn: <b>' + esc(name) + '</b>';
+    $('reopenModal').hidden = false;
+  }
+  function closeReopen() { $('reopenModal').hidden = true; }
+  function onReopenPick(e) {
+    var btn = e.target.closest('[data-rx]'); if (!btn) return;
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    if (STATE && STATE.players.length) { toast('Bàn đang có người — đóng hoặc dọn bàn trước.', 'err'); return; }
+    var how = btn.getAttribute('data-rx'), sid = RX.sid, name = RX.name;
+    var call, okMsg;
+    if (how === 'continue') {
+      call = srun('carryOverSession', sid, passcode, 'sameday');
+      okMsg = '➕ Chơi tiếp ngày của "' + name + '" — đóng lại sẽ lưu CÙNG NGÀY ✓';
+    } else if (how === 'edit') {
+      call = srun('reopenSession', sid, passcode, 'keep');
+      okMsg = '✏️ Đang sửa "' + name + '" — đóng lại giữ nguyên ngày & tên ✓';
+    } else {
+      if (!confirm('Mở lại "' + name + '" theo cách CŨ?\n\nPhiên bị gỡ khỏi lịch sử và khi đóng lại sẽ đóng dấu ngày HÔM NAY (mất ngày gốc).')) return;
+      call = srun('reopenSession', sid, passcode, 'now');
+      okMsg = 'Đã mở lại "' + name + '" — đóng lại sẽ tính vào hôm nay';
+    }
+    closeReopen();
+    mutating++;
+    call.then(function (state) { render(state); closeHistory(); toast(okMsg, 'ok'); })
+        .catch(onError).then(function () { mutating--; });
   }
   /** Xoá TOÀN BỘ lịch sử phiên (P23) — khoá xác nhận gõ "XOA HET" y như server. */
   function onDeleteAllSessions() {
@@ -1895,27 +2026,52 @@
       .then(function () { refreshHistory(); });
   }
 
+  /** P27: băng "phiên này sẽ lưu vào ngày …" + nút bỏ dấu (chỉ hiện khi có dấu ngày đang chờ). */
+  function pendingStampHTML() {
+    var ps = STATE && STATE.pendingStamp;
+    if (!ps) return '';
+    var what = ps.mode === 'continue'
+      ? 'Chơi tiếp ngày cũ — đóng lại tạo phiên MỚI trong ngày này'
+      : 'Đang sửa phiên cũ — đóng lại ghi đúng chỗ cũ (giữ tên phiên)';
+    return '<div class="hist-pending">' +
+      '<div class="hp-main"><b>📌 Phiên này sẽ lưu vào ngày ' + esc(ps.label) + '</b>' +
+        '<span>' + what + (ps.sourceName ? ' · nguồn: ' + esc(ps.sourceName) : '') + '</span></div>' +
+      (canEdit() ? '<button id="pendClearBtn" class="hp-clear" title="Bỏ dấu ngày — đóng phiên sẽ tính vào hôm nay">✕ Dùng hôm nay</button>' : '') +
+    '</div>';
+  }
+  function wireResetBar() {
+    var b = $('doResetBtn'); if (b) b.addEventListener('click', doResetSession);
+    var c = $('pendClearBtn'); if (c) c.addEventListener('click', onClearPending);
+  }
+  function onClearPending() {
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    mutate(srun('clearPendingStamp', passcode), 'Đã bỏ dấu ngày — đóng phiên tính vào hôm nay')
+      .then(function () { renderResetBar(); });
+  }
   function renderResetBar() {
     var bar = $('histResetBar');
     if (!STATE) { bar.innerHTML = ''; return; }
-    if (!canEdit()) { bar.innerHTML = '<div class="hist-note">🔒 Nhập passcode để đóng phiên.</div>'; return; }
+    var pend = pendingStampHTML();
+    if (!canEdit()) { bar.innerHTML = pend + '<div class="hist-note">🔒 Nhập passcode để đóng phiên.</div>'; wireResetBar(); return; }
     var n = STATE.players.length;
-    if (!n) { bar.innerHTML = '<div class="hist-note">Bàn đang trống — chơi xong bấm “Đóng phiên” để lưu vào lịch sử.</div>'; return; }
+    if (!n) { bar.innerHTML = pend + '<div class="hist-note">Bàn đang trống — chơi xong bấm “Đóng phiên” để lưu vào lịch sử.</div>'; wireResetBar(); return; }
     var balanced = STATE.imbalanceVND === 0;
-    bar.innerHTML =
+    bar.innerHTML = pend +
       '<div class="hist-reset">' +
         '<div class="hist-reset-info"><b>Phiên hiện tại</b>' +
           '<span>' + n + ' người · pot ' + fmtVND(STATE.potVND) + (balanced ? '' : ' · <i class="warn">Σ lệch</i>') + '</span></div>' +
         '<button id="doResetBtn" class="btn btn-danger"' + (balanced ? '' : ' disabled') + '>⟳ Đóng phiên &amp; lưu</button>' +
       '</div>' +
       (balanced ? '' : '<div class="hist-note warn">Σ Lời-Lỗ đang lệch — cân lại chip cho = 0 mới đóng được phiên.</div>');
-    var b = $('doResetBtn');
-    if (b) b.addEventListener('click', doResetSession);
+    wireResetBar();
   }
   function doResetSession() {
     if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
     var n = STATE ? STATE.players.length : 0;
-    if (!confirm('Đóng phiên hiện tại (' + n + ' người)?\n\nKết quả sẽ đóng băng vào lịch sử, bàn dọn trống để bắt đầu phiên mới. (BuyInLog giữ nguyên.)')) return;
+    var ps = STATE && STATE.pendingStamp;
+    var when = ps ? ('\n\n📌 Phiên này sẽ lưu vào NGÀY ' + ps.label +
+      (ps.mode === 'edit' ? ' (ghi đúng chỗ phiên cũ)' : ' (phiên mới cùng ngày)') + '.') : '';
+    if (!confirm('Đóng phiên hiện tại (' + n + ' người)?' + when + '\n\nKết quả sẽ đóng băng vào lịch sử, bàn dọn trống để bắt đầu phiên mới. (BuyInLog giữ nguyên.)')) return;
     mutating++;
     srun('resetSession', passcode).then(function (state) {
       render(state);
@@ -2210,8 +2366,14 @@
   // Port gần như nguyên xi từ weekly-chart/Dialog.html; đổi id/class sang tiền tố "wc"
   // và map màu theo biến theme của app. Bọc IIFE để state riêng, không đụng scope app.
   var WC = (function () {
-    var START = 0, DATES = [], WEEK_LABEL = '', UNIT = '', MU = '', BASE_LABEL = '', SNAMES = [];
+    var START = 0, DATES = [], WEEK_LABEL = '', UNIT = '', MU = '', BASE_LABEL = '', SNAMES = [], ISOS = [];
     var PLAYERS = [], N = 0, hidden = {}, hoverKey = null, geom = null, loaded = false;
+    // P28 — bảng màu "mỗi người 1 màu": đều SÁNG rõ trên nền tối của cả 3 theme (felt/vault/neon),
+    // xếp xen kẽ tông để 2 người cạnh nhau không bị giống nhau. Cạn màu thì quay vòng.
+    var WC_PALETTE = ['#4CC2FF', '#3DDC84', '#FFC247', '#FF7CAB', '#B47CFF', '#39D0C9', '#FF9F45',
+                      '#FF5D5D', '#9BE15D', '#6E8BFF', '#E07CFF', '#F5E663', '#57D9A3', '#FFB3C6'];
+    var colorOn = false;                       // false = tô theo lời/lỗ (xanh/đỏ) như cũ
+    try { colorOn = localStorage.getItem('pokerWcColor') === '1'; } catch (e) {}
     function wq(id) { return document.getElementById(id); }
     function fmt(n) { return Math.round(n).toLocaleString('de-DE'); }
     function money(n) { return fmt(n) + MU; }
@@ -2226,18 +2388,43 @@
     function cumMoneyAt(p, idx) { return idx <= 0 ? 0 : (p.money[idx - 1] || 0); }
     function deltaMoneyAt(p, idx) { return idx <= 0 ? 0 : cumMoneyAt(p, idx) - cumMoneyAt(p, idx - 1); }
     function visiblePlayers() { return PLAYERS.filter(function (p) { return !hidden[p.key]; }); }
+    /**
+     * Giờ ĐỊA PHƯƠNG của phiên thứ idx trên trục X (idx 1-based; 0 = mốc "Đầu"). '' nếu không có ISO.
+     * ⚠ Chỉ dùng cho GIỜ. Phần NGÀY luôn lấy nhãn server (tiền tố UTC) để 📈 khớp 📊 — xem handoff mục 8.
+     */
+    function timeOf(idx) {
+      var iso = ISOS[idx - 1]; if (!iso) return '';
+      var d = new Date(iso); if (isNaN(d.getTime())) return '';
+      return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    }
+    /** Bật/tắt "mỗi người 1 màu" (nhớ qua localStorage). */
+    function toggleColor() {
+      colorOn = !colorOn;
+      try { localStorage.setItem('pokerWcColor', colorOn ? '1' : '0'); } catch (e) {}
+      syncColorBtn();
+      if (loaded) { render(); buildLegend(); }
+    }
+    function syncColorBtn() {
+      var b = wq('wcColorBtn'); if (!b) return;
+      b.textContent = colorOn ? '🎨 Màu theo người' : '🎨 Màu lời/lỗ';
+      b.setAttribute('aria-pressed', String(colorOn));
+      b.classList.toggle('on', colorOn);
+    }
 
     function setData(data) {
       var D = data || { dates: [], start: 0, weekLabel: '', players: [] };
       START = D.start || 0; DATES = D.dates || []; WEEK_LABEL = D.weekLabel || '';
       UNIT = D.unit || ''; MU = D.moneyUnit || ''; BASE_LABEL = D.baseLabel || ('xuất phát ' + START);
       SNAMES = D.sessionNames || [];
+      ISOS = D.dateIsos || [];                 // P28: mốc ISO từng phiên -> hiện GIỜ địa phương
       PLAYERS = (D.players || []).map(function (p, i) {
         var series = [START].concat(p.rem || []);
         var mArr = p.money || [];
         var netMoney = mArr.length ? mArr[mArr.length - 1] : (series[series.length - 1] - START);
         return { key: 'p' + i, name: p.name, short: p.short || p.name, series: series, money: mArr,
-                 netMoney: netMoney, pol: netMoney > 0 ? 'up' : (netMoney < 0 ? 'down' : 'flat') };
+                 netMoney: netMoney, pol: netMoney > 0 ? 'up' : (netMoney < 0 ? 'down' : 'flat'),
+                 buyIn: Number(p.buyInTotal) || 0,            // P28: tổng nạp cả kỳ (₫)
+                 color: WC_PALETTE[i % WC_PALETTE.length] };  // P28: màu riêng khi bật "màu theo người"
       });
       N = DATES.length; hidden = {}; hoverKey = null; geom = null; loaded = true;
       renderHeader(); buildLegend(); buildTable(); render();
@@ -2245,7 +2432,11 @@
 
     function renderHeader() {
       wq('wcWk').textContent = WEEK_LABEL;
-      if (!PLAYERS.length) { wq('wcInsight').textContent = 'Chưa có phiên nào để vẽ.'; wq('wcTiles').innerHTML = ''; return; }
+      if (!PLAYERS.length) {
+        wq('wcInsight').textContent = 'Chưa có phiên nào để vẽ.';
+        wq('wcTiles').innerHTML = ''; wq('wcDays').innerHTML = '';
+        return;
+      }
       var byMoney = PLAYERS.slice().sort(function (a, b) { return b.netMoney - a.netMoney; });
       var leader = byMoney[0], worst = byMoney[byMoney.length - 1], spread = leader.netMoney - worst.netMoney;
       var bestSwing = { d: -Infinity, pl: null, idx: 0 }, worstSwing = { d: Infinity, pl: null, idx: 0 };
@@ -2263,19 +2454,58 @@
         'Chênh lệch đôi bên <b>' + money(spread) + '</b>. ' +
         (bestSwing.pl && bestSwing.d > 0 ? bestSwing.pl.short + ' phiên đỉnh (' + sgnM(bestSwing.d) + ' · ' + sname(bestSwing.idx) + '), ' : '') +
         (worstSwing.pl && worstSwing.d < 0 ? worstSwing.pl.short + ' phiên tệ nhất (' + sgnM(worstSwing.d) + ').' : '');
+      // P28: thêm 3 thẻ — nạp nhiều nhất cả kỳ, phiên lời to nhất, phiên lỗ nặng nhất (đều KÈM TÊN).
+      var topBuy = PLAYERS.slice().sort(function (a, b) { return b.buyIn - a.buyIn; })[0];
+      var hasBuy = !!(topBuy && topBuy.buyIn > 0);
+      var hasBest = !!(bestSwing.pl && bestSwing.d > 0), hasWorst = !!(worstSwing.pl && worstSwing.d < 0);
+      function dayOf(idx) { var t = timeOf(idx); return DATES[idx] + (t ? ' · ' + t : ''); }
       var tiles = [
         { c: 'up', lab: 'Lời nhiều nhất', val: leader.short, sub: sgnM(leader.netMoney) },
         { c: 'down', lab: 'Lỗ nặng nhất', val: worst.short, sub: sgnM(worst.netMoney) },
-        { c: '', lab: 'Chênh lệch đôi bên', val: money(spread), sub: leader.short + ' vs ' + worst.short }
+        { c: '', lab: 'Chênh lệch đôi bên', val: money(spread), sub: leader.short + ' vs ' + worst.short },
+        { c: 'buy', lab: 'Nạp nhiều nhất', val: hasBuy ? topBuy.short : '—',
+          sub: hasBuy ? money(topBuy.buyIn) : 'chưa có dữ liệu nạp' },
+        { c: 'up', lab: 'Phiên lời to nhất', val: hasBest ? bestSwing.pl.short : '—',
+          sub: hasBest ? sgnM(bestSwing.d) + ' · ' + dayOf(bestSwing.idx) : '—' },
+        { c: 'down', lab: 'Phiên lỗ nặng nhất', val: hasWorst ? worstSwing.pl.short : '—',
+          sub: hasWorst ? sgnM(worstSwing.d) + ' · ' + dayOf(worstSwing.idx) : '—' }
       ];
       wq('wcTiles').innerHTML = tiles.map(function (t) {
         return '<div class="wc-tile ' + t.c + '"><div class="lab">' + t.lab + '</div><div class="val">' + t.val + '</div><div class="sub">' + t.sub + '</div></div>';
       }).join('');
+      renderDays();
+    }
+
+    /**
+     * P28 — dải "từng phiên: ai lời nhiều nhất · ai lỗ nặng nhất" (kèm tên + số tiền + giờ).
+     * Tính trên TOÀN BỘ người trong kỳ (ẩn/hiện ở chú thích chỉ ảnh hưởng đường vẽ).
+     */
+    function renderDays() {
+      var box = wq('wcDays'); if (!box) return;
+      if (N < 2) { box.innerHTML = ''; return; }
+      var rows = [];
+      for (var i = 1; i < N; i++) {
+        var best = null, worst = null;
+        for (var j = 0; j < PLAYERS.length; j++) {
+          var p = PLAYERS[j], d = deltaMoneyAt(p, i);
+          if (!d) continue;
+          if (!best || d > best.d) best = { d: d, p: p };
+          if (!worst || d < worst.d) worst = { d: d, p: p };
+        }
+        var t = timeOf(i);
+        rows.push('<div class="wc-day">' +
+          '<span class="wd-date">' + DATES[i] + (t ? ' <i>' + t + '</i>' : '') + '</span>' +
+          '<span class="wd-win">' + (best && best.d > 0 ? '▲ ' + best.p.short + ' <b>' + sgnM(best.d) + '</b>' : '—') + '</span>' +
+          '<span class="wd-loss">' + (worst && worst.d < 0 ? '▼ ' + worst.p.short + ' <b>' + sgnM(worst.d) + '</b>' : '—') + '</span>' +
+        '</div>');
+      }
+      box.innerHTML = '<div class="wc-days-head">Từng phiên · ai lời nhiều nhất · ai lỗ nặng nhất</div>' + rows.join('');
     }
 
     function render() {
       if (!PLAYERS.length) return;
       var svg = wq('wcSvg'), chartbox = wq('wcChartbox');
+      chartbox.classList.toggle('wc-colored', colorOn);   // P28: mỗi người 1 màu
       var W = chartbox.clientWidth || 900;
       var H = Math.max(320, Math.min(520, Math.round(W * 0.56)));
       var m = { l: 52, r: Math.min(96, Math.max(66, W * 0.12)), t: 16, b: 34 };
@@ -2307,7 +2537,7 @@
         var pp = p.series.map(function (v, i) { return { x: X(i), y: Y(v), v: v }; });
         pts[p.key] = pp;
         var d = pp.map(function (q, i) { return (i ? 'L' : 'M') + q.x.toFixed(1) + ' ' + q.y.toFixed(1); }).join(' ');
-        parts.push('<g class="wc-grp ' + p.pol + (hidden[p.key] ? ' hidden' : '') + '" data-key="' + p.key + '">');
+        parts.push('<g class="wc-grp ' + p.pol + (hidden[p.key] ? ' hidden' : '') + '" data-key="' + p.key + '" style="--pc:' + p.color + '">');
         parts.push('<path class="wc-line" d="' + d + '"/>');
         pp.forEach(function (q) { parts.push('<circle class="wc-dot" cx="' + q.x.toFixed(1) + '" cy="' + q.y.toFixed(1) + '" r="3.5"/>'); });
         var e = pp[pp.length - 1];
@@ -2332,7 +2562,7 @@
       parts.push(endItems.map(function (it) {
         var ld = (Math.abs(it.y - it.y0) > 2)
           ? '<line class="wc-leader" x1="' + (it.x + 3) + '" y1="' + it.y0 + '" x2="' + (labX - 3) + '" y2="' + it.y + '"/>' : '';
-        return '<g class="wc-grp ' + it.p.pol + '" data-key="' + it.p.key + '">' + ld +
+        return '<g class="wc-grp ' + it.p.pol + '" data-key="' + it.p.key + '" style="--pc:' + it.p.color + '">' + ld +
                '<text class="wc-endlab" x="' + labX + '" y="' + it.y + '">' + it.p.short + '</text></g>';
       }).join(''));
       parts.push('</g>');
@@ -2375,7 +2605,11 @@
       if (focus) showSingleTip(best, idx); else showColumnTip(idx);
     }
     function rankAt(p, idx) { var v = p.series[idx], r = 1; visiblePlayers().forEach(function (q) { if (q.series[idx] > v) r++; }); return r; }
-    function headDate(idx) { return idx <= 0 ? 'Đầu' : (SNAMES[idx - 1] ? SNAMES[idx - 1] : DATES[idx]); }
+    function headDate(idx) {
+      if (idx <= 0) return 'Đầu';
+      var t = timeOf(idx);                     // P28: kèm giờ -> phân biệt 2 phiên cùng ngày
+      return (SNAMES[idx - 1] ? SNAMES[idx - 1] : DATES[idx]) + (t ? ' · ' + t : '');
+    }
     function showSingleTip(p, idx) {
       var stack = p.series[idx], cum = cumMoneyAt(p, idx), dPrev = deltaMoneyAt(p, idx);
       var html = '<div class="th"><span>' + p.name + '</span><span class="d">' + headDate(idx) + '</span></div>' +
@@ -2409,7 +2643,8 @@
       var order = PLAYERS.slice().sort(function (a, b) { return b.netMoney - a.netMoney; });
       wq('wcLegend').innerHTML = order.map(function (p) {
         return '<span class="wc-chip ' + p.pol + (hidden[p.key] ? ' off' : '') + '" data-key="' + p.key + '" role="button" tabindex="0" aria-pressed="' + (!hidden[p.key]) + '">' +
-          '<span class="sw"></span><span class="cn">' + p.short + '</span><span class="cnet">' + sgnM(p.netMoney) + '</span></span>';
+          '<span class="sw"' + (colorOn ? ' style="background:' + p.color + '"' : '') + '></span>' +
+          '<span class="cn">' + p.short + '</span><span class="cnet">' + sgnM(p.netMoney) + '</span></span>';
       }).join('');
       Array.prototype.forEach.call(wq('wcLegend').children, function (ch) {
         var key = ch.getAttribute('data-key');
@@ -2475,10 +2710,12 @@
       wq('chartModal').hidden = false;
       weekKey = '';                              // mỗi lần mở: về TUẦN MỚI NHẤT
       wq('wcWeeks').hidden = true;
+      syncColorBtn();
       load();
     }
     function close() { wq('chartModal').hidden = true; }
 
+    wq('wcColorBtn').addEventListener('click', toggleColor);
     wq('wcWeekSel').addEventListener('change', function () { weekKey = this.value; load(); });
     wq('wcPrev').addEventListener('click', function () { step(1); });    // ◀ tuần cũ hơn
     wq('wcNext').addEventListener('click', function () { step(-1); });   // ▶ tuần mới hơn
@@ -2543,6 +2780,9 @@
     $('bfRows').addEventListener('input', onBfInput);
     $('bfRows').addEventListener('click', onBfRowsClick);
     $('bfSave').addEventListener('click', onBfSave);
+    $('rxClose').addEventListener('click', closeReopen);
+    $('reopenModal').addEventListener('click', function (e) { if (e.target.dataset && e.target.dataset.close) closeReopen(); });
+    $('rxOpts').addEventListener('click', onReopenPick);
     $('delAllBtn').addEventListener('click', onDeleteAllSessions);
     $('allinRows').addEventListener('input', onAllinInput);
     $('allinRows').addEventListener('change', onAllinInput);
@@ -2557,6 +2797,7 @@
       if (!$('allinModal').hidden) closeAllIn();
       if (!$('xferModal').hidden) closeXfer();
       if (!$('countModal').hidden) closeCount();
+      if (!$('reopenModal').hidden) closeReopen();
       if (!$('chartModal').hidden) WC.close();
       if (!$('backfillModal').hidden) closeBackfill();
     });
