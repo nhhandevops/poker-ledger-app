@@ -399,7 +399,14 @@
     font-size:13px; padding:6px 9px; border-radius:8px; cursor:pointer; line-height:1; }
   .hsess-del:hover { border-color:var(--loss); color:var(--loss); background:rgba(255,93,93,.1); }
   body.locked .hsess-reopen, body.locked .hsess-carry,
-  body.locked .hsess-del, body.locked .hsess-delall { display:none !important; }
+  body.locked .hsess-del, body.locked .hsess-delall, body.locked .hsess-prune { display:none !important; }
+  /* P29 — dọn bản lưu cũ + vinh danh riêng trong thẻ 6 tháng */
+  .hsess-prune { font-size:12px; padding:5px 10px; }
+  .stat-awards-head { padding:9px 12px 0; font-size:11px; letter-spacing:.5px; text-transform:uppercase;
+    color:var(--muted); font-weight:700; border-top:1px solid var(--hairline); }
+  .stat-awards { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:6px; padding:8px 10px 10px; }
+  .stat-awards .award { padding:8px 9px; background:var(--bg); }
+  .stat-awards .award-icon { font-size:20px; }
   .hist-empty { padding:22px; text-align:center; color:var(--muted); font-size:14px; line-height:1.6; }
   .hist-loading { padding:16px; text-align:center; color:var(--muted); }
 
@@ -795,6 +802,7 @@
               <button class="seg-btn" data-gran="day">Ngày</button>
               <button class="seg-btn is-on" data-gran="week">Tuần</button>
               <button class="seg-btn" data-gran="month">Tháng</button>
+              <button class="seg-btn" data-gran="half" title="Tổng kết 6 tháng: T1–T6 và T7–T12, kèm vinh danh riêng từng kỳ">6 tháng</button>
             </div>
           </div>
           <div id="statDayWrap" class="stat-dayfilter" hidden>
@@ -808,6 +816,7 @@
             <h3>Các phiên đã lưu</h3>
             <div class="hsess-tools">
               <button id="bfOpen" class="btn btn-ghost bf-open-btn" title="Nhập bù một buổi đã chơi nhưng quên ghi">⏪ Nhập bù phiên cũ</button>
+              <button id="pruneBtn" class="btn btn-ghost hsess-prune" title="Dọn bản lưu chi tiết (dùng cho Mở lại / Ngày mới) của phiên cũ — KẾT QUẢ và thống kê giữ nguyên">🧹 Dọn bản lưu cũ</button>
               <button id="delAllBtn" class="btn btn-ghost hsess-delall" title="Xoá toàn bộ lịch sử phiên (không hoàn tác)">🗑 Xoá tất cả</button>
             </div>
           </div>
@@ -1832,8 +1841,8 @@
     renderStats();
   }
   /** Từ 'month'/'week' -> cấp con kế; 'day' -> null. */
-  function childGranOf(g) { return g === 'month' ? 'week' : g === 'week' ? 'day' : null; }
-  function kidWord(g) { return g === 'month' ? 'tuần' : g === 'week' ? 'ngày' : ''; }
+  function childGranOf(g) { return g === 'half' ? 'month' : g === 'month' ? 'week' : g === 'week' ? 'day' : null; }
+  function kidWord(g) { return g === 'half' ? 'tháng' : g === 'month' ? 'tuần' : g === 'week' ? 'ngày' : ''; }
 
   /** 1 thẻ kỳ (đệ quy). gran = cấp của thẻ này; nếu có con -> bung được. */
   function statCardHTML(p, gran, depth) {
@@ -1862,6 +1871,16 @@
           '<span class="stat-pot">pot ' + fmtVND(p.totalPotVND) + '</span></span>' +
       '</div>' +
       '<div class="stat-plist">' + rows + '</div>' +
+      ((p.awards && p.awards.length)                       // P29: vinh danh riêng của kỳ 6 tháng
+        ? '<div class="stat-awards-head">🏅 Nổi bật trong kỳ</div><div class="stat-awards">' +
+            p.awards.map(function (a) {
+              var m = AWARD_META[a.key] || { icon: '🎖', title: a.key };
+              var tone = (a.key === 'poorest' || a.key === 'bigloss') ? ' loss' : (a.key === 'richest' || a.key === 'bigwin') ? ' win' : '';
+              return '<div class="award' + tone + '"><div class="award-icon">' + m.icon + '</div><div class="award-body">' +
+                '<div class="award-title">' + m.title + '</div><div class="award-name">' + esc(a.name) + '</div>' +
+                '<div class="award-detail">' + awardDetail(a) + '</div></div></div>';
+            }).join('') + '</div>'
+        : '') +
       kidsHTML +
     '</div>';
   }
@@ -2010,6 +2029,35 @@
     mutating++;
     call.then(function (state) { render(state); closeHistory(); toast(okMsg, 'ok'); })
         .catch(onError).then(function () { mutating--; });
+  }
+  /**
+   * P29 — Dọn bản lưu chi tiết (SessionSnapshots) của phiên cũ. Hỏi số tháng → đếm thử (dryRun,
+   * không ghi) → xác nhận → mới xoá thật. Kết quả / thống kê / biểu đồ / tích lũy KHÔNG đổi.
+   */
+  function onPruneSnapshots() {
+    if (!canEdit()) { toast('🔒 Nhập passcode để sửa.', 'err'); return; }
+    var m = prompt('Dọn BẢN LƯU CHI TIẾT của các phiên cũ hơn bao nhiêu THÁNG?\n\n' +
+      'Bản lưu này chỉ dùng cho ↩ Mở lại và ▶ Ngày mới.\n' +
+      'Kết quả, 📊 thống kê, 📈 biểu đồ, bảng tích lũy GIỮ NGUYÊN.', '6');
+    if (m == null) return;
+    m = parseInt(String(m).replace(/[^\d]/g, ''), 10);
+    if (!m || m < 1 || m > 60) { toast('Số tháng phải từ 1 đến 60.', 'err'); return; }
+    mutating++;
+    srun('pruneOldSnapshots', m, passcode, true).then(function (plan) {
+      if (!plan.removed) {
+        toast('Không có bản lưu nào cũ hơn ' + m + ' tháng (trước ' + plan.cutoffYmd + ') — chưa cần dọn ✓', 'info');
+        return null;
+      }
+      if (!confirm('Sẽ xoá ' + plan.removed + ' bản lưu chi tiết của phiên kết thúc trước ' + plan.cutoffYmd +
+        ' (giữ lại ' + plan.kept + ').\n\n• Các phiên đó sẽ KHÔNG còn nút ↩ Mở lại / ▶ Ngày mới.\n' +
+        '• Kết quả, 📊 thống kê, 📈 biểu đồ, bảng tích lũy GIỮ NGUYÊN.\n• Không hoàn tác.')) return null;
+      return srun('pruneOldSnapshots', m, passcode, false);
+    }).then(function (res) {
+      if (!res) return;
+      render(res.state);
+      toast('🧹 Đã dọn ' + res.removed + ' bản lưu cũ ✓', 'ok');
+      refreshHistory();
+    }).catch(onError).then(function () { mutating--; });
   }
   /** Xoá TOÀN BỘ lịch sử phiên (P23) — khoá xác nhận gõ "XOA HET" y như server. */
   function onDeleteAllSessions() {
@@ -2784,6 +2832,7 @@
     $('reopenModal').addEventListener('click', function (e) { if (e.target.dataset && e.target.dataset.close) closeReopen(); });
     $('rxOpts').addEventListener('click', onReopenPick);
     $('delAllBtn').addEventListener('click', onDeleteAllSessions);
+    $('pruneBtn').addEventListener('click', onPruneSnapshots);
     $('allinRows').addEventListener('input', onAllinInput);
     $('allinRows').addEventListener('change', onAllinInput);
     $('allinApply').addEventListener('click', onAllinApply);
