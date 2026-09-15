@@ -3172,6 +3172,24 @@
   }
 
   // (2) Service worker — chỉ chạy trên https hoặc localhost.
+  // P35 — bản mới tới NHANH (gặp thật 15/09: PC để tab mở vẫn chạy code cũ sau 3 lần publish):
+  //  • hỏi bản mới mỗi 30 phút + mỗi lần quay lại tab/app (tab mở lâu không tự hỏi);
+  //  • có bản mới mà app đang RẢNH (mở chưa tới 60s, hoặc lúc quay lại tab) ⇒ tự tải lại;
+  //  • đang bận (đang ghi / còn chip chưa gửi / đang gõ) ⇒ chỉ hiện banner "chạm để tải lại", không cắt ngang.
+  var OPENED_AT = Date.now();
+  var updateReady = false;
+  function appIdle() {
+    if (window.mutating > 0) return false;
+    if (window.dirtyChips && Object.keys(window.dirtyChips).length) return false;
+    var a = document.activeElement;
+    var tag = (a && a.tagName) ? String(a.tagName).toUpperCase() : '';
+    return !(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT');
+  }
+  function onUpdateReady() {
+    updateReady = true;
+    if (Date.now() - OPENED_AT < 60000 && appIdle()) { location.reload(); return; }
+    showBanner('✨ Có bản mới của app — chạm để tải lại', function () { location.reload(); });
+  }
   var secure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   if (navigator.serviceWorker && secure) {
     window.addEventListener('load', function () {
@@ -3181,10 +3199,17 @@
           var nw = reg.installing;
           if (!nw) return;
           nw.addEventListener('statechange', function () {
-            if (nw.state === 'activated' && hadController) {
-              showBanner('✨ Có bản mới của app — chạm để tải lại', function () { location.reload(); });
-            }
+            if (nw.state === 'activated' && hadController) onUpdateReady();
           });
+        });
+        var check = function () {
+          try { var p = reg.update(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+        };
+        setInterval(check, 30 * 60000);
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState !== 'visible') return;
+          if (updateReady && appIdle()) { location.reload(); return; }
+          check();
         });
       }).catch(function () {});
     });
