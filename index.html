@@ -525,7 +525,8 @@
   /*    scope dưới .wc + map sang biến theme của app (felt/vault/neon).            */
   .modal-card.modal-wide { max-width:920px; }
   .wc-state { padding:26px; text-align:center; color:var(--muted); font-size:14px; line-height:1.6; }
-  .wc-weeks { display:flex; align-items:center; gap:8px; }
+  .wc-weeks { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .wc-gran { flex:0 0 auto; }                         /* P30: nút Tuần / Tháng */
   .wc-weeks .inp-sel { flex:1 1 auto; min-width:0; font-weight:700; }
   .wc-nav { flex:0 0 auto; width:34px; height:34px; border:1px solid var(--hairline); background:var(--raised);
     color:var(--text); border-radius:9px; font-size:12px; cursor:pointer; }
@@ -557,10 +558,10 @@
   #wcChartbox.wc-colored .wc-grp .wc-enddot { fill:var(--pc, var(--wc-flat)); }
   #wcChartbox.wc-colored .wc-grp .wc-endlab { fill:var(--pc, var(--muted)); }
   /* P28 — dải "từng phiên: ai lời nhiều nhất · ai lỗ nặng nhất" */
-  .wc-days { display:flex; flex-direction:column; margin:10px 0 2px;
-    border:1px solid var(--hairline); border-radius:12px; overflow:hidden; background:var(--raised); }
-  .wc-days-head { padding:7px 12px; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
-    color:var(--muted); font-weight:700; background:rgba(0,0,0,.16); border-bottom:1px solid var(--hairline); }
+  .wc-days { display:flex; flex-direction:column; margin:10px 0 2px; max-height:340px; overflow-y:auto;   /* P30: cả tháng ~30 dòng -> cuộn */
+    border:1px solid var(--hairline); border-radius:12px; background:var(--raised); }
+  .wc-days-head { position:sticky; top:0; z-index:1; padding:7px 12px; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--muted); font-weight:700; background:var(--surface); border-bottom:1px solid var(--hairline); }
   .wc-day { display:grid; grid-template-columns:minmax(74px,auto) 1fr 1fr; gap:10px; align-items:center;
     padding:7px 12px; border-bottom:1px solid var(--hairline); font-size:12.5px; }
   .wc-day:last-child { border-bottom:0; }
@@ -974,9 +975,13 @@
       </div>
       <div class="modal-body">
         <div class="wc-weeks" id="wcWeeks" hidden>
-          <button type="button" id="wcPrev" class="wc-nav" title="Tuần trước">◀</button>
+          <div id="wcGran" class="seg wc-gran" role="tablist" title="Xem biểu đồ theo tuần hoặc cả tháng">
+            <button type="button" class="seg-btn is-on" data-g="week">Tuần</button>
+            <button type="button" class="seg-btn" data-g="month" id="wcGranMonth">Tháng</button>
+          </div>
+          <button type="button" id="wcPrev" class="wc-nav" title="Kỳ trước">◀</button>
           <select id="wcWeekSel" class="inp inp-sel"></select>
-          <button type="button" id="wcNext" class="wc-nav" title="Tuần sau">▶</button>
+          <button type="button" id="wcNext" class="wc-nav" title="Kỳ sau">▶</button>
         </div>
         <div id="wcState" class="wc-state">Đang tải…</div>
         <div class="wc" id="wcApp" hidden>
@@ -2503,16 +2508,18 @@
         (bestSwing.pl && bestSwing.d > 0 ? bestSwing.pl.short + ' phiên đỉnh (' + sgnM(bestSwing.d) + ' · ' + sname(bestSwing.idx) + '), ' : '') +
         (worstSwing.pl && worstSwing.d < 0 ? worstSwing.pl.short + ' phiên tệ nhất (' + sgnM(worstSwing.d) + ').' : '');
       // P28: thêm 3 thẻ — nạp nhiều nhất cả kỳ, phiên lời to nhất, phiên lỗ nặng nhất (đều KÈM TÊN).
-      var topBuy = PLAYERS.slice().sort(function (a, b) { return b.buyIn - a.buyIn; })[0];
-      var hasBuy = !!(topBuy && topBuy.buyIn > 0);
+      // P30: ai BẰNG NHAU ở mức nạp cao nhất thì hiện TẤT CẢ (không chỉ 1 người đầu danh sách).
+      var maxBuy = PLAYERS.reduce(function (m, p) { return Math.max(m, p.buyIn || 0); }, 0);
+      var topBuys = maxBuy > 0 ? PLAYERS.filter(function (p) { return p.buyIn === maxBuy; }) : [];
+      var hasBuy = topBuys.length > 0;
       var hasBest = !!(bestSwing.pl && bestSwing.d > 0), hasWorst = !!(worstSwing.pl && worstSwing.d < 0);
       function dayOf(idx) { var t = timeOf(idx); return DATES[idx] + (t ? ' · ' + t : ''); }
       var tiles = [
         { c: 'up', lab: 'Lời nhiều nhất', val: leader.short, sub: sgnM(leader.netMoney) },
         { c: 'down', lab: 'Lỗ nặng nhất', val: worst.short, sub: sgnM(worst.netMoney) },
         { c: '', lab: 'Chênh lệch đôi bên', val: money(spread), sub: leader.short + ' vs ' + worst.short },
-        { c: 'buy', lab: 'Nạp nhiều nhất', val: hasBuy ? topBuy.short : '—',
-          sub: hasBuy ? money(topBuy.buyIn) : 'chưa có dữ liệu nạp' },
+        { c: 'buy', lab: 'Nạp nhiều nhất', val: hasBuy ? topBuys.map(function (p) { return p.short; }).join(' · ') : '—',
+          sub: hasBuy ? money(maxBuy) + (topBuys.length > 1 ? ' mỗi người · ' + topBuys.length + ' người bằng nhau' : '') : 'chưa có dữ liệu nạp' },
         { c: 'up', lab: 'Phiên lời to nhất', val: hasBest ? bestSwing.pl.short : '—',
           sub: hasBest ? sgnM(bestSwing.d) + ' · ' + dayOf(bestSwing.idx) : '—' },
         { c: 'down', lab: 'Phiên lỗ nặng nhất', val: hasWorst ? worstSwing.pl.short : '—',
@@ -2577,7 +2584,14 @@
       var yb = Y(START);
       parts.push('<line class="wc-baseline" x1="' + m.l + '" y1="' + yb + '" x2="' + (W - m.r) + '" y2="' + yb + '"/>');
       parts.push('<text class="wc-baselab" x="' + (W - m.r - 2) + '" y="' + (yb - 4) + '" text-anchor="end">' + BASE_LABEL + '</text>');
-      for (var i = 0; i < N; i++) { parts.push('<text class="wc-xtick" x="' + X(i) + '" y="' + (H - 14) + '">' + DATES[i] + '</text>'); }
+      // P30: xem cả THÁNG có thể ~30 phiên ⇒ thưa bớt nhãn trục X cho khỏi đè nhau
+      // (luôn giữ nhãn đầu + nhãn cuối; mọi phiên vẫn xem được ở tooltip và dải từng phiên).
+      var tickEvery = Math.max(1, Math.ceil(N / Math.max(2, Math.floor(plotW / 58))));
+      for (var i = 0; i < N; i++) {
+        var showTick = (i % tickEvery === 0) || i === N - 1;
+        if (i !== N - 1 && i % tickEvery === 0 && (N - 1 - i) < tickEvery / 2 && i !== 0) showTick = false;   // tránh đè nhãn cuối
+        if (showTick) parts.push('<text class="wc-xtick" x="' + X(i) + '" y="' + (H - 14) + '">' + DATES[i] + '</text>');
+      }
       parts.push('<line class="wc-crosshair" id="wcXh" x1="0" y1="' + m.t + '" x2="0" y2="' + (m.t + plotH) + '"/>');
       var pts = {}, endItems = [];
       parts.push('<g class="wc-lines">');
@@ -2717,19 +2731,35 @@
     function showState(msg) { var s = wq('wcState'); s.textContent = msg; s.hidden = false; wq('wcApp').hidden = true; }
 
     // ── Chọn kỳ: '' = tuần mới nhất (mặc định) · 'all' = tất cả · 'YYYY-MM-DD' = 1 tuần ──
-    var weekKey = '', WEEKS = [];
-    function buildWeekSel(weeks, cur) {
-      WEEKS = weeks || [];
+    // P30: kỳ theo TUẦN hoặc THÁNG (nút Tuần/Tháng) + "Tất cả". WEEKS = danh sách kỳ đang chọn.
+    var weekKey = '', WEEKS = [], gran = 'week', LAST = { weeks: [], months: [] };
+    function periodList() { return gran === 'month' ? LAST.months : LAST.weeks; }
+    function buildWeekSel(data, cur) {
+      LAST.weeks = (data && data.weeks) || [];
+      LAST.months = (data && data.months) || [];                 // server cũ không có -> ẩn nút Tháng
+      if (data && (data.periodType === 'week' || data.periodType === 'month')) gran = data.periodType;
+      WEEKS = periodList();
       var sel = wq('wcWeekSel');
       sel.innerHTML = WEEKS.map(function (w) {
         return '<option value="' + w.key + '">' + w.label + ' (' + w.sessions + ' phiên)</option>';
       }).join('') + '<option value="all">Tất cả các phiên</option>';
       sel.value = cur;
-      wq('wcWeeks').hidden = !(WEEKS.length > 1 || cur === 'all');
-      // WEEKS xếp MỚI NHẤT trước ⇒ ◀ (tuần trước) = index+1, ▶ (tuần sau) = index−1.
+      Array.prototype.forEach.call(wq('wcGran').children, function (b) {
+        b.classList.toggle('is-on', cur !== 'all' && b.getAttribute('data-g') === gran);
+      });
+      wq('wcGranMonth').hidden = !LAST.months.length;
+      wq('wcWeeks').hidden = !(LAST.weeks.length || LAST.months.length);
+      // Danh sách xếp MỚI NHẤT trước ⇒ ◀ (kỳ trước) = index+1, ▶ (kỳ sau) = index−1.
       var i = WEEKS.map(function (w) { return w.key; }).indexOf(cur);
       wq('wcPrev').disabled = !(i >= 0 && i < WEEKS.length - 1);
       wq('wcNext').disabled = !(i > 0);
+    }
+    function onGran(e) {
+      var b = e.target.closest('[data-g]'); if (!b) return;
+      gran = b.getAttribute('data-g');
+      var list = periodList();
+      weekKey = list.length ? list[0].key : 'all';               // sang Tháng/Tuần -> kỳ MỚI NHẤT
+      load();
     }
     function step(delta) {                       // delta +1 = lùi về tuần cũ hơn
       var i = WEEKS.map(function (w) { return w.key; }).indexOf(weekKey);
@@ -2742,12 +2772,12 @@
       showState('Đang tải…');
       srun('getWeeklyChart', weekKey).then(function (data) {
         if (!data || !data.players || !data.players.length) {
-          if (data && data.weeks) buildWeekSel(data.weeks, data.weekKey || 'all');
+          if (data && data.weeks) buildWeekSel(data, data.weekKey || 'all');
           showState('Kỳ này chưa có phiên nào để vẽ. Chọn kỳ khác hoặc đóng thêm 1 phiên.');
           return;
         }
         weekKey = data.weekKey || '';
-        buildWeekSel(data.weeks, weekKey);
+        buildWeekSel(data, weekKey);
         wq('wcState').hidden = true; wq('wcApp').hidden = false;
         setData(data);
       }).catch(function (e) {
@@ -2756,7 +2786,7 @@
     }
     function open() {
       wq('chartModal').hidden = false;
-      weekKey = '';                              // mỗi lần mở: về TUẦN MỚI NHẤT
+      weekKey = ''; gran = 'week';               // mỗi lần mở: về TUẦN MỚI NHẤT
       wq('wcWeeks').hidden = true;
       syncColorBtn();
       load();
@@ -2764,6 +2794,7 @@
     function close() { wq('chartModal').hidden = true; }
 
     wq('wcColorBtn').addEventListener('click', toggleColor);
+    wq('wcGran').addEventListener('click', onGran);
     wq('wcWeekSel').addEventListener('change', function () { weekKey = this.value; load(); });
     wq('wcPrev').addEventListener('click', function () { step(1); });    // ◀ tuần cũ hơn
     wq('wcNext').addEventListener('click', function () { step(-1); });   // ▶ tuần mới hơn
