@@ -1042,7 +1042,7 @@
   <div id="toasts" class="toasts"></div>
   <div id="loading" class="loading" hidden><div class="spinner"></div></div>
 
-  <script>window.POKER_API="https://script.google.com/macros/s/AKfycbxwYk-MuaSkGdY6nUpW-Ep2QF5U86MhzhUYQEaa0J1Vo5b_ykpt5kxHn8gocnwvN6xd/exec";</script>
+  <script>window.POKER_API="https://script.google.com/macros/s/AKfycbxwYk-MuaSkGdY6nUpW-Ep2QF5U86MhzhUYQEaa0J1Vo5b_ykpt5kxHn8gocnwvN6xd/exec";window.POKER_BRIDGE="https://script.google.com/macros/s/AKfycbxwYk-MuaSkGdY6nUpW-Ep2QF5U86MhzhUYQEaa0J1Vo5b_ykpt5kxHn8gocnwvN6xd/exec?bridge=1";</script>
   <script>
   // Giao tiếp server qua srun(): google.script.run khi chạy trong /exec, fetch JSON khi chạy ở trang tĩnh (P26).
   var STATE = null;
@@ -1163,15 +1163,27 @@
   var NET_READS = { getState: 1, getRevision: 1, checkPasscode: 1, getHistory: 1, getStats: 1, getWeeklyChart: 1 };
   var NET_READ_DELAYS = [800, 2000, 4000];     // đọc: 1 + 3 lần thử lại
   var NET_WRITE_DELAYS = [1000, 2500];         // ghi: 1 + 2 lần thử lại (khi server có chống trùng)
+  var NET_BRIDGE_READY_MS = 8000;              // P34: chờ cầu nối lên tối đa 8s, quá thì dùng đường fetch
+  var NET_BRIDGE_CALL_MS = 45000;              // P34: 1 lời gọi qua cầu nối quá 45s ⇒ coi như lỗi mạng (được thử lại)
   var netServerDedupe = false;                 // bật khi thấy phản hồi có api ≥ 2
   function netRid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 8);
   }
-  function netWait(ms) {
-    var k = (window.NET_DELAY_SCALE == null) ? 1 : window.NET_DELAY_SCALE;   // test đặt 0 cho nhanh
-    return new Promise(function (res) { setTimeout(res, ms * k); });
+  function netScale() { return (window.NET_DELAY_SCALE == null) ? 1 : window.NET_DELAY_SCALE; }   // test đặt nhỏ cho nhanh
+  function netWait(ms) { return new Promise(function (res) { setTimeout(res, ms * netScale()); }); }
+  function netNetErr(msg) { var e = new Error(msg); e.net = true; return e; }
+  function netParse(t, where) {
+    var j;
+    try { j = JSON.parse(t); } catch (e) { throw netNetErr('Google Apps Script đang chập chờn (' + where + ')'); }
+    if (j && j.api >= 2) netServerDedupe = true;
+    if (!j || !j.ok) {
+      var se = new Error((j && j.error) || 'Có lỗi xảy ra, thử lại.');
+      se.busy = /Bàn đang bận/.test(se.message);
+      throw se;
+    }
+    return j.result;
   }
-  function netOnce(api, method, args, rid) {
+  function netFetch(api, method, args, rid) {
     var body = { fn: method, args: args };
     if (rid) body.rid = rid;
     return fetch(api, {
@@ -1179,20 +1191,92 @@
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // text/plain = "simple request", không preflight
       body: JSON.stringify(body),
     }).then(function (r) {
-      return r.text().then(function (t) {
-        var j;
-        try { j = JSON.parse(t); } catch (e) {
-          var bad = new Error('Google Apps Script đang chập chờn (HTTP ' + r.status + ')'); bad.net = true; throw bad;
-        }
-        if (j && j.api >= 2) netServerDedupe = true;
-        if (!j || !j.ok) {
-          var se = new Error((j && j.error) || 'Có lỗi xảy ra, thử lại.');
-          se.busy = /Bàn đang bận/.test(se.message);
-          throw se;
-        }
-        return j.result;
-      });
-    }, function () { var ne = new Error('Không kết nối được server'); ne.net = true; throw ne; });
+      return r.text().then(function (t) { return netParse(t, 'HTTP ' + r.status); });
+    }, function () { throw netNetErr('Không kết nối được server'); });
+  }
+
+  // P34 — CẦU NỐI: nhúng ẩn window.POKER_BRIDGE (= /exec?bridge=1, Bridge.html), gửi lệnh bằng postMessage, trang đó
+  // gọi server bằng google.script.run. Đo thật 15/09: đường này 24/24 OK ~1s khi đường fetch hỏng 5/12, chậm tới 58s
+  // (bước "echo" của Google trả 404 sau ~30s). Cầu nối không lên (vd Safari chặn khung nhúng Google) ⇒ tự dùng
+  // đường fetch như P33, nhớ 6 giờ để khỏi phải chờ lại mỗi lần mở; cầu nối lên muộn vẫn được dùng từ lúc đó.
+  var bridge = { state: 'off', win: null, origin: '', pend: {}, seq: 0, waiters: [], okOnce: false };
+  function bridgeAllowedOrigin(o) {
+    var own = '';
+    try { own = new URL(window.POKER_BRIDGE).origin; } catch (e) {}
+    return !!o && (o === own || /^https:\/\/[a-z0-9.-]+\.googleusercontent\.com$/.test(o));
+  }
+  function bridgeMemo(v) { try { localStorage.setItem('pokerBridge', v); } catch (e) {} }
+  function bridgeRecentlyDead() {
+    try {
+      var v = String(localStorage.getItem('pokerBridge') || '');
+      return v.indexOf('dead:') === 0 && (Date.now() - Number(v.slice(5))) < 6 * 3600000;
+    } catch (e) { return false; }
+  }
+  function bridgeSettle(ok) { var w = bridge.waiters; bridge.waiters = []; w.forEach(function (f) { f(ok); }); }
+  function bridgeStart() {
+    if (bridge.state !== 'off') return;
+    if (!window.POKER_BRIDGE || !document.body || typeof window.addEventListener !== 'function') { bridge.state = 'late'; return; }
+    bridge.state = 'loading';
+    window.addEventListener('message', function (ev) {
+      var d = ev.data;
+      if (!d || d.pl !== 'poker-bridge' || !bridgeAllowedOrigin(ev.origin)) return;
+      if (d.type === 'ready') {
+        bridge.win = ev.source; bridge.origin = ev.origin;
+        if (bridge.state !== 'ready') { bridge.state = 'ready'; bridgeMemo('ok'); bridgeSettle(true); }
+      } else if (d.type === 'reply' && bridge.pend[d.id]) {
+        var p = bridge.pend[d.id]; delete bridge.pend[d.id]; clearTimeout(p.timer); p.done(d);
+      }
+    });
+    var f = document.createElement('iframe');
+    f.src = window.POKER_BRIDGE;
+    f.title = 'poker-bridge';
+    f.setAttribute('aria-hidden', 'true');
+    f.tabIndex = -1;
+    f.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;border:0;opacity:0';
+    document.body.appendChild(f);
+    setTimeout(function () {
+      if (bridge.state !== 'loading') return;
+      bridge.state = 'late';                 // chưa lên kịp ⇒ tạm dùng fetch; tin 'ready' tới muộn vẫn bật lại cầu nối
+      bridgeMemo('dead:' + Date.now());
+      bridgeSettle(false);
+    }, NET_BRIDGE_READY_MS * netScale());
+  }
+  function bridgeReady() {
+    if (!window.POKER_BRIDGE) return Promise.resolve(false);
+    bridgeStart();
+    if (bridge.state === 'ready') return Promise.resolve(true);
+    if (bridge.state !== 'loading' || bridgeRecentlyDead()) return Promise.resolve(false);
+    return new Promise(function (res) { bridge.waiters.push(res); });
+  }
+  function bridgeCall(method, args, rid) {
+    return new Promise(function (resolve, reject) {
+      var id = 'c' + (++bridge.seq);
+      function fail(msg) {
+        if (!bridge.okOnce) bridge.state = 'late';   // chưa từng chạy được ⇒ bỏ cầu nối, lần thử sau đi đường fetch
+        reject(netNetErr(msg));
+      }
+      var timer = setTimeout(function () {
+        if (!bridge.pend[id]) return;
+        delete bridge.pend[id];
+        fail('Google Apps Script không trả lời');
+      }, NET_BRIDGE_CALL_MS * netScale());
+      bridge.pend[id] = { timer: timer, done: function (d) {
+        if (d.ok) { bridge.okOnce = true; resolve(String(d.body)); }
+        else fail('Google Apps Script đang chập chờn (' + (d.error || 'cầu nối lỗi') + ')');
+      } };
+      try {
+        bridge.win.postMessage({ pl: 'poker-bridge', type: 'call', id: id, fn: method, args: args, rid: rid || '' }, bridge.origin);
+      } catch (e) {
+        clearTimeout(timer); delete bridge.pend[id];
+        fail('Không gửi được lệnh qua cầu nối');
+      }
+    });
+  }
+  function netOnce(api, method, args, rid) {
+    return bridgeReady().then(function (useBridge) {
+      if (!useBridge) return netFetch(api, method, args, rid);
+      return bridgeCall(method, args, rid).then(function (t) { return netParse(t, 'cầu nối'); });
+    });
   }
   function srun(method) {
     var args = Array.prototype.slice.call(arguments, 1);
