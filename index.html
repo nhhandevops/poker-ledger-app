@@ -1151,8 +1151,49 @@
   //  (a) chạy TRONG /exec (HtmlService)  → google.script.run như trước.
   //  (b) chạy ở trang TĨNH (GitHub Pages) → fetch POST JSON ẩn danh tới window.POKER_API
   //      (= URL /exec, do dev-tools/build-static.js chèn). Không cookie ⇒ không dính
-  //      multi-account / Brave Shields. Server trả {ok, result | error} (Code.gs apiCall).
+  //      multi-account / Brave Shields. Server trả {ok, result | error, api} (Code.gs apiCall).
+  // P33 — Google hay trả trang HTML 404 thay cho kết quả (trước đây hiện "Server trả về không đúng định dạng").
+  //  • Hàm ĐỌC: tự thử lại tối đa 4 lần (chờ 0,8 → 2 → 4 giây), người dùng không thấy gì.
+  //  • Hàm GHI: gửi kèm `rid` (1 mã / 1 thao tác, GIỮ NGUYÊN khi thử lại) và CHỈ thử lại khi server báo
+  //    `api ≥ 2` (Code.gs apiCallOnce chống ghi 2 lần). Lý do: script chạy XONG rồi Google mới trả 404 ở bước
+  //    lấy kết quả ⇒ thử lại mù sẽ nạp tiền 2 lần. "Bàn đang bận" (chưa ghi gì) thì thử lại được luôn.
+  //  • Hết lượt mà GHI vẫn lỗi mạng ⇒ báo "CÓ THỂ đã lưu" + tự tải lại bàn (onError) để thấy sự thật.
+  // NET-BEGIN — dev-tools/test-net.js tách đúng đoạn này ra để test (giữ nguyên 2 dấu mốc).
   function hasScriptRun() { return !!(window.google && google.script && google.script.run); }
+  var NET_READS = { getState: 1, getRevision: 1, checkPasscode: 1, getHistory: 1, getStats: 1, getWeeklyChart: 1 };
+  var NET_READ_DELAYS = [800, 2000, 4000];     // đọc: 1 + 3 lần thử lại
+  var NET_WRITE_DELAYS = [1000, 2500];         // ghi: 1 + 2 lần thử lại (khi server có chống trùng)
+  var netServerDedupe = false;                 // bật khi thấy phản hồi có api ≥ 2
+  function netRid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 8);
+  }
+  function netWait(ms) {
+    var k = (window.NET_DELAY_SCALE == null) ? 1 : window.NET_DELAY_SCALE;   // test đặt 0 cho nhanh
+    return new Promise(function (res) { setTimeout(res, ms * k); });
+  }
+  function netOnce(api, method, args, rid) {
+    var body = { fn: method, args: args };
+    if (rid) body.rid = rid;
+    return fetch(api, {
+      method: 'POST', redirect: 'follow', credentials: 'omit',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // text/plain = "simple request", không preflight
+      body: JSON.stringify(body),
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var j;
+        try { j = JSON.parse(t); } catch (e) {
+          var bad = new Error('Google Apps Script đang chập chờn (HTTP ' + r.status + ')'); bad.net = true; throw bad;
+        }
+        if (j && j.api >= 2) netServerDedupe = true;
+        if (!j || !j.ok) {
+          var se = new Error((j && j.error) || 'Có lỗi xảy ra, thử lại.');
+          se.busy = /Bàn đang bận/.test(se.message);
+          throw se;
+        }
+        return j.result;
+      });
+    }, function () { var ne = new Error('Không kết nối được server'); ne.net = true; throw ne; });
+  }
   function srun(method) {
     var args = Array.prototype.slice.call(arguments, 1);
     if (hasScriptRun()) {
@@ -1163,29 +1204,40 @@
     }
     var api = window.POKER_API;
     if (!api) return Promise.reject(new Error('Chưa cấu hình địa chỉ API (POKER_API).'));
-    return fetch(api, {
-      method: 'POST', redirect: 'follow', credentials: 'omit',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // text/plain = "simple request", không preflight
-      body: JSON.stringify({ fn: method, args: args }),
-    }).then(function (r) {
-      return r.text().then(function (t) {
-        var j; try { j = JSON.parse(t); } catch (e) { throw new Error('Server trả về không đúng định dạng (HTTP ' + r.status + ').'); }
-        if (!j || !j.ok) throw new Error((j && j.error) || 'Có lỗi xảy ra, thử lại.');
-        return j.result;
+    var isRead = !!NET_READS[method];
+    var rid = isRead ? '' : netRid();
+    var delays = isRead ? NET_READ_DELAYS : NET_WRITE_DELAYS;
+    var attempt = 0;
+    function go() {
+      attempt++;
+      return netOnce(api, method, args, rid).catch(function (err) {
+        var canRetry = err.busy || (err.net && (isRead || netServerDedupe));
+        if (canRetry && attempt <= delays.length) return netWait(delays[attempt - 1]).then(go);
+        if (!err.net) throw err;                 // lỗi nghiệp vụ (sai passcode…) / bận quá lâu: báo nguyên văn
+        var msg = err.message + (attempt > 1 ? ' — đã thử ' + attempt + ' lần' : '');
+        var out = new Error(isRead ? msg + '. Thử lại sau ít giây.'
+                                   : msg + '. Thao tác CÓ THỂ đã lưu — đã tải lại bàn, kiểm tra trước khi bấm lại.');
+        out.transient = true;
+        out.uncertainWrite = !isRead;
+        throw out;
       });
-    }, function () { throw new Error('Không kết nối được server — kiểm tra mạng rồi thử lại.'); });
+    }
+    return go();
   }
+  // NET-END
   function showLoading(on) { $('loading').hidden = !on; }
-  function toast(msg, type) {
+  function toast(msg, type, ms) {
     var el = document.createElement('div');
     el.className = 'toast ' + (type || 'info');
     el.textContent = msg;
     $('toasts').appendChild(el);
-    setTimeout(function () { el.style.opacity = '0'; setTimeout(function () { el.remove(); }, 300); }, 2600);
+    setTimeout(function () { el.style.opacity = '0'; setTimeout(function () { el.remove(); }, 300); }, ms || 2600);
   }
   function onError(err) {
     console.error(err);
-    toast((err && err.message) ? err.message : 'Có lỗi xảy ra, thử lại.', 'err');
+    toast((err && err.message) ? err.message : 'Có lỗi xảy ra, thử lại.', 'err', (err && err.transient) ? 6500 : 0);
+    // P33: ghi mà mạng hỏng giữa chừng ⇒ không biết đã lưu chưa ⇒ tải lại bàn để thấy đúng số thật.
+    if (err && err.uncertainWrite) srun('getState').then(render).catch(function () {});
   }
 
   // Bọc 1 mutation: khóa nút, spinner, render kết quả, toast lỗi.
@@ -2230,11 +2282,20 @@
   }
 
   // ── Poll nhẹ cho máy xem ───────────────────────────────────
+  // P33: lỗi mạng khi poll KHÔNG hiện toast mỗi 10s (hàm đọc đã tự thử lại). Hỏng 2 lượt liên tiếp mới báo 1 lần,
+  // có mạng lại thì báo "đã kết nối lại". pollBusy: lượt trước còn đang thử lại thì bỏ qua lượt mới (không chồng).
+  var pollBusy = false, pollFails = 0;
   function poll() {
-    if (document.hidden || mutating > 0 || Object.keys(dirtyChips).length) return;
+    if (pollBusy || document.hidden || mutating > 0 || Object.keys(dirtyChips).length) return;
+    pollBusy = true;
     srun('getRevision').then(function (rev) {
-      if (rev !== localRevision && mutating === 0) srun('getState').then(render).catch(onError);
-    }).catch(function () {});
+      if (pollFails >= 2) toast('✅ Đã kết nối lại server', 'ok');
+      pollFails = 0;
+      if (rev !== localRevision && mutating === 0) return srun('getState').then(render);
+    }).catch(function () {
+      pollFails++;
+      if (pollFails === 2) toast('📡 Google Apps Script đang chập chờn — app vẫn tự thử lại; số trên màn hình có thể chưa mới nhất.', 'err', 7000);
+    }).then(function () { pollBusy = false; });
   }
 
   // ── Mua chip của người khác (Phase 24) ─────────────────────

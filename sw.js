@@ -1,11 +1,11 @@
-/* Poker Ledger — service worker (P31). build-static.js thay e7c865f26e bằng mã băm của bản build,
+/* Poker Ledger — service worker (P31). build-static.js thay e3831bc0fc bằng mã băm của bản build,
  * nên MỖI lần publish là 1 service worker mới: tự tải vỏ app mới, xoá cache cũ.
  * Chiến lược:
  *  • Trang (index.html): trả bản đã lưu NGAY (mở tức thì), đồng thời tải bản mới về lưu cho lần sau.
  *  • Icon / manifest: lấy từ cache, thiếu thì mạng.
  *  • KHÔNG đụng yêu cầu khác nguồn (API Apps Script) và mọi yêu cầu không phải GET — dữ liệu luôn đi thẳng server.
  */
-var CACHE = 'poker-ledger-e7c865f26e';
+var CACHE = 'poker-ledger-e3831bc0fc';
 var SHELL = ['./', './index.html', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function (e) {
